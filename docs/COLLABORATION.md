@@ -63,6 +63,12 @@ and bidirectional delivery and replay through the production JavaScript
 session port using a substitute editor adapter. The local development
 server runs the same HTTP routes against temporary SQLite storage.
 
+Set `TESSERA_S7` to a compiled Upsilon s7 command-line runner to also check
+that the room bridge's functions survive separate calls through the
+browser's Scheme evaluation wrapper. The runner is built from
+`src/src/Scheme/Glue/s7-run.c` and `src/src/Scheme/S7/s7.c` in the
+upstream checkout.
+
 ## Host lease and durable outbox design
 
 - A lease has one owner, an expiry, and a monotonically increasing

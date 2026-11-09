@@ -25,6 +25,8 @@ const examples = new Set(["nested-derivation.tm", "nested-import.tex"]);
 const upstream = "https://mgubi.github.io/texmacs/";
 const types = {
   ".css": "text/css; charset=utf-8",
+  ".md": "text/plain; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
   ".svg": "image/svg+xml",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -88,6 +90,16 @@ async function load(path) {
     return readFile(join(root, "web/app", path === "/" ? "index.html" : file));
   }
   if (path === "/examples/" + file && examples.has(file)) return readFile(join(root, "web/examples", file));
+  if (path === "/legal/" || path === "/legal/index.html") return readFile(join(root, "web/legal/index.html"));
+  if (path === "/legal/texmacs.html.txt") return readFile(join(engine, "texmacs.html"));
+  if (path === "/legal/" + file && ["PORT.md", "ENGINE-SHA256.txt", "COLLABORATION.md"].includes(file)) {
+    return readFile(join(root, "docs", file));
+  }
+  if (path === "/legal/upstream-licenses/" + file && /^[A-Za-z0-9.-]+\.(?:txt|md)$/u.test(file)) {
+    return readFile(join(root, "docs/upstream-licenses", file)).catch(error => {
+      if (error.code !== "ENOENT") throw error;
+    });
+  }
   if (path !== "/" + file) return undefined;
   if (engineFiles.has(file)) return readFile(join(engine, file));
   const compressed = packGzip.get(file) ?? (file === "texmacs.wasm" ? "texmacs.wasm.gz" : undefined);

@@ -1,6 +1,6 @@
 // The detached base tracks only accepted revisions. The live body also
 // contains edits waiting to be sent. Native patch transforms keep both in sync.
-export const roomScheme = String.raw`
+const roomScheme = String.raw`
 (begin
   (define tessera-url #f)
   (define tessera-author #f)
@@ -87,3 +87,7 @@ export const roomScheme = String.raw`
                                         (set! tessera-base next) #t))))))))))))
 )
 `;
+
+// Upsilon runs each scheme() call inside a fresh lambda. The observer and
+// its state must live in the interpreter root to survive the next call.
+export const installRoom = `(eval-string ${JSON.stringify(roomScheme)} (rootlet))`;

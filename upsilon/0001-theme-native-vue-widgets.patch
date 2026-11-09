@@ -1,0 +1,71 @@
+diff --git a/src/src/Plugins/Vue/vue_widget.cpp b/src/src/Plugins/Vue/vue_widget.cpp
+--- a/src/src/Plugins/Vue/vue_widget.cpp
++++ b/src/src/Plugins/Vue/vue_widget.cpp
+@@ -263,6 +263,42 @@
+   .cursor= {224, 0, 0, 255},
+   .radius= 12
+ };
++
++// Tessera browser theme, added for the embedding application in 2026.
++// These colours apply to the native widgets and the page surround.
++#ifdef __EMSCRIPTEN__
++static const vue_theme vue_theme_tessera= {
++  .shade= { {205, 217, 206, 255}, {220, 226, 216, 255},
++            {241, 245, 235, 255}, {253, 253, 248, 255} },
++  .background= {246, 245, 239, 255},
++  .highlight= {228, 239, 223, 255},
++  .text= {23, 41, 35, 255},
++  .text_grey= {93, 107, 100, 255},
++  .border= {205, 217, 206, 255},
++  .field= {253, 253, 248, 255},
++  .field_focused= {241, 245, 235, 255},
++  .selection= {24, 68, 57, 255},
++  .selection_text= {253, 253, 248, 255},
++  .selection_soft= {217, 234, 219, 255},
++  .button= {253, 253, 248, 255},
++  .button_hover= {228, 239, 223, 255},
++  .button_down= {207, 228, 213, 255},
++  .pressed= {217, 234, 219, 255},
++  .scrollbar= {91, 116, 105, 120},
++  .scrollbar_hover= {56, 123, 100, 190},
++  .bar_line= {220, 226, 216, 255},
++  .bar_mode= {241, 245, 235, 255},
++  .bar_focus= {253, 253, 248, 255},
++  .tab_inactive= {235, 240, 229, 255},
++  .canvas= {235, 239, 230, 255},
++  .balloon= {253, 253, 248, 255},
++  .balloon_border= {205, 217, 206, 255},
++  .pre_edit= {241, 245, 235, 255},
++  .pre_edit_line= {56, 123, 100, 255},
++  .cursor= {24, 68, 57, 255},
++  .radius= 8
++};
++#endif
+ 
+ static const vue_theme vue_theme_dark= {
+   .shade= { {36, 36, 38, 255}, {52, 52, 55, 255},
+@@ -474,6 +510,11 @@
+ // the class tm-dark of the page: the dark colours of its frame (the tabs,
+ // the menu of TeXmacs Vue, its dialogs); tm-theme-set tells the frame that
+ // TeXmacs chose (before, the frame follows the system)
++EM_JS (int, vue_web_tessera_theme, (), {
++  return typeof document !== 'undefined' &&
++         document.documentElement.classList.contains ('tessera-embedded') ? 1 : 0;
++});
++
+ EM_JS (void, vue_web_frame_theme, (int dark), {
+   if (typeof document === 'undefined') return; // the node build: no page
+   var c = document.documentElement.classList;
+@@ -495,6 +536,12 @@
+   else if (name == "light") dark= false;
+   else dark= (SDL_GetSystemTheme () == SDL_SYSTEM_THEME_DARK);
+   the_theme= dark ? vue_theme_dark : vue_theme_light;
++#ifdef __EMSCRIPTEN__
++  if (N(forced) == 0 && vue_web_tessera_theme ()) {
++    dark= false;
++    the_theme= vue_theme_tessera;
++  }
++#endif
+   // TEXMACS_VUE_RADIUS overrides the rounding of the corners (0: square)
+   string radius= get_env ("TEXMACS_VUE_RADIUS");
+   if (N(radius) > 0 && is_double (radius))

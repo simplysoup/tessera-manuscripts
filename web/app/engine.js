@@ -1,4 +1,4 @@
-import { roomScheme } from "./native-room.js";
+import { installRoom } from "./native-room.js";
 
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
@@ -125,7 +125,7 @@ export async function mountEditor(host, draft, signal) {
   return {
     setTools,
     room() {
-      call(roomScheme);
+      call(installRoom);
       call(`(tessera-start ${url})`);
       return {
         take() {

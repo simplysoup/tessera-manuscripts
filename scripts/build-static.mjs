@@ -14,6 +14,12 @@ await cp(join(root, "worker/index.js"), join(output, "server/index.js"));
 await cp(join(root, "web/app"), join(dist, "app"), { recursive: true });
 await cp(join(root, "web/app/index.html"), join(dist, "index.html"));
 await cp(join(root, "web/examples"), join(dist, "examples"), { recursive: true });
+await cp(join(root, "web/legal"), join(dist, "legal"), { recursive: true });
+await cp(join(root, "docs/PORT.md"), join(dist, "legal/PORT.md"));
+await cp(join(root, "docs/ENGINE-SHA256.txt"), join(dist, "legal/ENGINE-SHA256.txt"));
+await cp(join(root, "docs/COLLABORATION.md"), join(dist, "legal/COLLABORATION.md"));
+await cp(join(root, "docs/upstream-licenses"), join(dist, "legal/upstream-licenses"), { recursive: true });
+await cp(join(engine, "texmacs.html"), join(dist, "legal/texmacs.html.txt"));
 for (const entry of await readdir(engine, { withFileTypes: true })) {
   if (entry.isFile()) await cp(join(engine, entry.name), join(dist, entry.name));
 }

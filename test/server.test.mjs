@@ -22,6 +22,9 @@ if (process.env.NODE_TEST_CONTEXT) {
     const launch = await get("/?open=examples/nested-derivation.tm", { redirect: "manual" });
     assert.equal(launch.headers.get("location"), "/texmacs.html?open=examples/nested-derivation.tm");
     assert.match(await (await get("/")).text(), /Tessera/u);
+    assert.match(await (await get("/legal/")).text(), /Exact TeXmacs Upsilon source revision/u);
+    assert.match(await (await get("/legal/upstream-licenses/GPL-3.0.txt")).text(), /GNU GENERAL PUBLIC LICENSE/u);
+    assert.match(await (await get("/legal/texmacs.html.txt")).text(), /tessera-embedded/u);
     assert.equal((await get("/app/style.css")).headers.get("content-type"), "text/css; charset=utf-8");
     assert.match(await (await get("/texmacs.html")).text(), /TeXmacs Upsilon/u);
     const wasm = await get("/texmacs.wasm", { headers: { Range: "bytes=0-7" } });
