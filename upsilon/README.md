@@ -34,12 +34,16 @@ The sixth patch aligns the native menu, toolbar surface, icon targets, and
 paper surround with the Tessera workspace frame. The embedded editor
 selects the Upsilon Lucide icon set by default.
 
+The seventh patch removes the rounded outer frame, loads Lucide toolbar icons
+with the initial resources, and persists only TeXmacs' disposable font and
+file cache between embedded editor frames. Manuscripts and editor preferences
+remain in Tessera's own storage.
+
 The full Upsilon web target retains its own storage, tabs, and plug-ins.
 Tessera's frontend owns document persistence. Native preferences in the
 embedded runtime are transient. The build still includes the C++ editor,
-typesetter, and renderer. This pass reduces the browser distribution and
-startup work. Measure the first-edit path before cutting more from the
-binary or changing how the editor renders.
+typesetter, and renderer. The cache speeds up later editor launches after the
+first font database is built; first launch still builds it once.
 
 ## Apply and build
 

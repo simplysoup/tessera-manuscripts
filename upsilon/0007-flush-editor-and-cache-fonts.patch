@@ -1,0 +1,30 @@
+diff --git a/src/misc/wasm/package.py b/src/misc/wasm/package.py
+--- a/src/misc/wasm/package.py
++++ b/src/misc/wasm/package.py
+@@ -48,6 +48,6 @@
+ BOOT_GROUPS = ['progs/', 'styles/', 'packages/', 'texts/', 'plugins/', 'cache/',
+                'langs/encoding/', 'fonts/tfm/', 'fonts/enc/', 'fonts/virtual/',
+-               'misc/pixmaps/neoclassical/light/']
++               'misc/pixmaps/neoclassical/light/', 'misc/pixmaps/lucide/']
+ BOOT_FILES = ['fonts/font-database.scm', 'fonts/font-characteristics.scm',
+               'fonts/font-features.scm', 'fonts/font-substitutions.scm',
+               'fonts/pdf-font-issues.scm',
+diff --git a/src/misc/wasm/web-pre.js b/src/misc/wasm/web-pre.js
+--- a/src/misc/wasm/web-pre.js
++++ b/src/misc/wasm/web-pre.js
+@@ -174,4 +174,14 @@
+     ENV['TEXMACS_TESSERA_EDITOR'] = '1';
+     FS.mkdirTree ('/home/web/.TeXmacs');
++    // Keep the compiled font and file cache between editor iframes without
++    // persisting the embedded editor's preferences or working documents.
++    var cachePath = '/home/web/.TeXmacs/system/cache';
++    FS.mkdirTree (cachePath);
++    FS.mount (IDBFS, { autoPersist: true }, cachePath);
++    addRunDependency ('tm-embedded-font-cache');
++    FS.syncfs (true, function (err) {
++      if (err) console.error ('TeXmacs: cannot read the saved font cache', err);
++      removeRunDependency ('tm-embedded-font-cache');
++    });
+     return;
+   }
+*** End Patch

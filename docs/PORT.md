@@ -16,7 +16,9 @@ Apply the [native theme](upsilon/0001-theme-native-vue-widgets.patch),
 [caret and fraction targets](upsilon/0003-embedded-caret-and-fraction-targets.patch),
 [studio menu](upsilon/0004-single-studio-menu.patch),
 [contextual editing tools](upsilon/0005-contextual-editing-tools.patch), and
-[workspace styling](upsilon/0006-unified-studio-chrome.patch) patches in order.
+[workspace styling](upsilon/0006-unified-studio-chrome.patch), and
+[flush editor and font cache](upsilon/0007-flush-editor-and-cache-fonts.patch)
+patches in order.
 
 ## Source map
 

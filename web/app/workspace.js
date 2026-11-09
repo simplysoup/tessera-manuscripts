@@ -537,7 +537,14 @@ setInterval(() => {
   if (!state?.editor || state.busy || state.saving || state.leaving) return;
   try {
     syncManuscriptMenu(state.editor);
-    if (!state.room) save(state).catch(() => {});
+    if (!state.room) {
+      if (state.editor.recentlyActive()) {
+        state.autosaveDeferredAt ??= performance.now();
+        if (performance.now() - state.autosaveDeferredAt < 8000) return;
+      }
+      state.autosaveDeferredAt = undefined;
+      save(state).catch(() => {});
+    }
   } catch { status("Editor unavailable", "error"); }
 }, 2500);
 

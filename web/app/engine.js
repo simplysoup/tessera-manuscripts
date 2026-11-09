@@ -65,6 +65,10 @@ function boot(host) {
     engine().tmProgress.running(() => { started = true; });
     await until(() => started, signal, "The editor did not finish starting. Try opening the manuscript again.");
     const runtime = engine();
+    let lastActivity = 0;
+    const markActivity = () => { lastActivity = performance.now(); };
+    runtime.addEventListener("keydown", markActivity, true);
+    runtime.addEventListener("pointerdown", markActivity, true);
     const view = runtime.TeXmacs.scheme(`(begin
       (set-preference "header" "on")
       (set-preference "icon set" "lucide")
@@ -75,7 +79,7 @@ function boot(host) {
       (set-preference "status bar" "off"))`);
     if (view.startsWith("(error ")) throw new Error("The editor could not configure its toolbars.");
     runtime.FS.mkdirTree("/tmp/tessera");
-    return { runtime, iframe };
+    return { runtime, iframe, recentlyActive: () => performance.now() - lastActivity < 900 };
   })().catch(error => {
     iframe.remove();
     running = undefined;
@@ -86,7 +90,7 @@ function boot(host) {
 }
 
 export async function mountEditor(host, draft, signal, { onShortcut, shortcutHint }) {
-  const { runtime, iframe } = await boot(host);
+  const { runtime, iframe, recentlyActive } = await boot(host);
   signal.throwIfAborted();
   const call = code => {
     const result = runtime.TeXmacs.scheme(code);
@@ -166,6 +170,7 @@ export async function mountEditor(host, draft, signal, { onShortcut, shortcutHin
       iframe.focus();
     },
     active: () => current() === path,
+    recentlyActive,
     dirty: () => call(`(and (buffer-exists? ${url}) (buffer-modified? ${url}))`) === "#t",
     context() {
       if (current() !== path) return "";
