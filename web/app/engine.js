@@ -17,6 +17,9 @@ const inserts = {
   section: "(make-section 'section)",
   theorem: "(make 'theorem)",
   fraction: "(make-fraction)",
+  root: "(make-sqrt)",
+  superscript: "(make-script #t #t)",
+  subscript: "(make-script #f #t)",
   bold: "(make-with \"font-series\" \"bold\")",
   italic: "(make-with \"font-shape\" \"italic\")",
   undo: "(undo 0)",
@@ -114,7 +117,7 @@ export async function mountEditor(host, draft, signal) {
     runtime.dispatchEvent(new runtime.Event("resize"));
   }
   function requireManuscript() {
-    if (current() !== path) throw new Error("Use Tools → Native TeXmacs menus to select your manuscript.");
+    if (current() !== path) throw new Error("Use More → Native TeXmacs menus to select your manuscript.");
   }
   function rename(title) {
     call(`(buffer-set-title ${url} ${JSON.stringify(title)})`);

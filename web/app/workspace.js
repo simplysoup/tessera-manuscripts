@@ -155,7 +155,8 @@ $("dialog").addEventListener("close", async () => {
 function enable(ready) {
   for (const id of ["rename", "save", "source-mode", "share"]) $(id).disabled = !ready;
   $("rename").disabled ||= Boolean(state?.draft?.room);
-  for (const id of ["exports", "inserts", "tools"]) {
+  $("editor-commands").disabled = !ready;
+  for (const id of ["exports", "advanced-tools"]) {
     $(id).firstElementChild.setAttribute("aria-disabled", String(!ready));
     for (const button of $(id).querySelectorAll("button")) button.disabled = !ready;
     if (!ready) $(id).open = false;
@@ -193,7 +194,7 @@ async function openDraft(id, shared) {
     $("studio").hidden = false;
     $("library").hidden = true;
     $("editor-hint").textContent = "Starting the editor…";
-    $("editor-context").textContent = "";
+    $("editor-context").textContent = "Document";
     $("mode-label").textContent = "TYPESET VIEW";
     $("editor-host").dataset.ready = "false";
     $("editor-host").inert = true;
@@ -324,7 +325,7 @@ function syncView(editor) {
   const source = editor.source();
   $("source-mode").setAttribute("aria-pressed", String(source));
   $("mode-label").textContent = source ? "SOURCE VIEW" : "TYPESET VIEW";
-  try { $("editor-context").textContent = editor.context(); } catch { $("editor-context").textContent = ""; }
+  try { $("editor-context").textContent = editor.context() || "Document"; } catch { $("editor-context").textContent = "Document"; }
 }
 
 $("new").addEventListener("click", () => createDraft(templates.blank));
@@ -392,19 +393,18 @@ $("native-tools").addEventListener("click", () => {
   try {
     state.editor.setTools(next);
     $("native-tools").setAttribute("aria-pressed", String(next));
-    $("tools").open = false;
+    $("advanced-tools").open = false;
   } catch (error) { notice(error.message); }
 });
-for (const id of ["exports", "inserts", "tools"]) {
+for (const id of ["exports", "advanced-tools"]) {
   $(id).firstElementChild.addEventListener("click", event => {
     if (!state?.editor) event.preventDefault();
   });
   $(id).addEventListener("toggle", () => {
-    if ($(id).open) for (const other of ["exports", "inserts", "tools"]) if (other !== id) $(other).open = false;
+    if ($(id).open) $(id === "exports" ? "advanced-tools" : "exports").open = false;
   });
 }
 document.querySelectorAll("[data-insert]").forEach(button => button.addEventListener("click", () => {
-  button.closest("details").open = false;
   try { state.editor.insert(button.dataset.insert); }
   catch (error) { notice(error.message); }
 }));

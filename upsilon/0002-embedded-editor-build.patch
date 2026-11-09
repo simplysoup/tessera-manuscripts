@@ -4,7 +4,7 @@ diff --git a/src/misc/wasm/Makefile b/src/misc/wasm/Makefile
 @@ -37,10 +37,36 @@
  OUT      := out-femtolisp
  endif
- 
+
 +# Keep the embedded distribution separate so packaging can never delete
 +# the full distribution's packs when switching profiles.
 +ifeq ($(TESSERA_WEB),1)
@@ -39,9 +39,9 @@ diff --git a/src/misc/wasm/Makefile b/src/misc/wasm/Makefile
    Scheme/Femtolisp/fl_core.c Scheme/Femtolisp/fl_llt.c \
    Scheme/Femtolisp/femtolisp_tm.cpp
 @@ -131,6 +157,13 @@
- 
+
  web: $(OUT)/web/texmacs.html $(OUT)/web/texmacs-files.json $(WEB_ICONS) $(OUT)/web/index.html $(OUT)/web/downloads.html $(OUT)/web/features.html $(SCREENSHOTS) $(OUT)/web/changes.html $(OUT)/web/changes.md $(OUT)/web/thanks.html $(OUT)/web/thanks.md $(OUT)/web/fixes.html $(OUT)/web/texmacs-64.png licenses tikzjax asymptote python r
- 
+
 +# Browser editor assets only. The full web target also builds the public site,
 +# documentation screenshots and external computational runtimes.
 +tessera-web:
@@ -55,7 +55,7 @@ diff --git a/src/misc/wasm/Makefile b/src/misc/wasm/Makefile
 @@ -278,11 +311,12 @@
  	@mkdir -p $(OUT)/web/screenshots
  	cp $< $@
- 
+
 -$(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/print.js $(W)/workers.js $(W)/javascript.js $(W)/ime.js $(W)/wallet.js $(W)/shell.html
 +$(OUT)/web/texmacs.html: $(OBJECTS) $(LIBDEPS) $(W)/progress.js $(W)/packages.js $(W)/web-pre.js $(W)/files.js $(W)/frame.js $(W)/clipboard.js $(W)/print.js $(W)/workers.js $(W)/javascript.js $(W)/ime.js $(addprefix $(W)/,$(WEB_EXTRAS)) $(W)/shell.html
  	@mkdir -p $(OUT)/web
@@ -78,41 +78,54 @@ diff --git a/src/misc/wasm/Makefile b/src/misc/wasm/Makefile
 +	@mkdir -p $(OUT)/web
 +	TESSERA_WEB=$(TESSERA_WEB) python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt $(PACKAGE_EXTRA)
  	$(BROTLI_PACKS)
- 	python3 $(W)/build-info.py $(TM) $(CURDIR) $(MUPDF) "$(THORVG)" $(BUILD_INFO)
+-	python3 $(W)/build-info.py $(TM) $(CURDIR) $(MUPDF) "$(THORVG)" $(BUILD_INFO)
 -	python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt $(PACKAGE_EXTRA)
++	python3 $(W)/build-info.py $(TM) $(CURDIR) $(MUPDF) "$(THORVG)" $(BUILD_INFO) $(OUT)/web
 +	TESSERA_WEB=$(TESSERA_WEB) python3 $(W)/package.py $(TM)/TeXmacs $(OUT)/web $(W)/boot-files.txt $(PACKAGE_EXTRA)
  	$(BROTLI_PACKS)
- 
+
  BROTLI_PACKS = -command -v brotli > /dev/null && for f in $(OUT)/web/tm-*.pack $(OUT)/web/tm-font-*; do \
 @@ -422,4 +456,4 @@
  clean:
  	rm -rf $(OBJ) $(OUT)
- 
+
 -.PHONY: all web node clean licenses tikzjax asymptote python r plugins-sync femtolisp-cache
 +.PHONY: all web tessera-web tessera-assets node clean licenses tikzjax asymptote python r plugins-sync femtolisp-cache
 diff --git a/src/misc/wasm/package.py b/src/misc/wasm/package.py
 --- a/src/misc/wasm/package.py
 +++ b/src/misc/wasm/package.py
-@@ -78,7 +78,15 @@
+@@ -78,7 +78,19 @@
    return (any (rel.startswith (d) for d in LAZY_DIRS) and
            os.path.splitext (rel)[1].lower () in LAZY_EXTS)
- 
+
 +# Tessera handles document storage and has no execution-session UI. Keep
 +# conversion plug-ins, styles, fonts and the native editing resources.
 +EMBEDDED = os.environ.get ('TESSERA_WEB') == '1'
 +EMBEDDED_EXCLUDE = ['plugins/' + p for p in ('ai', 'python', 'r', 'tikz', 'asymptote')]
 +EMBEDDED_EXCLUDE += ['misc/font-samples']
++# The core's lazy format registry loads this even for regular manuscripts.
++EMBEDDED_KEEP = ['plugins/python/progs/python-format.scm']
 +
  def excluded (rel):
++  if EMBEDDED and any (p == rel or p.startswith (rel + '/') for p in EMBEDDED_KEEP):
++    return False
 +  if EMBEDDED and any (rel == d or rel.startswith (d + '/') for d in EMBEDDED_EXCLUDE):
 +    return True
    if any (rel == d or rel.startswith (d + '/') for d in PLUGIN_DOCS): return False
    return any (fnmatch.fnmatch (rel, e) or rel.startswith (e + '/') for e in EXCLUDE)
- 
+
 diff --git a/src/misc/wasm/shell.html b/src/misc/wasm/shell.html
 --- a/src/misc/wasm/shell.html
 +++ b/src/misc/wasm/shell.html
-@@ -21,6 +21,8 @@
+@@ -4,6 +4,7 @@
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <title>TeXmacs Upsilon</title>
++<meta name="tessera-embedded" content="@TM_EMBEDDED@">
+ <!-- the logo of TeXmacs Upsilon (TeXmacs/misc/images, made by
+      misc/icons/vue-logo/make-vue-logo.py, copied by misc/wasm/Makefile); Safari
+      takes the .ico -->
+@@ -21,6 +22,8 @@
    canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%;
             display: block; outline: none; }
    /* until the panel of misc/wasm/progress.js replaces it */
@@ -121,11 +134,11 @@ diff --git a/src/misc/wasm/shell.html b/src/misc/wasm/shell.html
    #status { position: fixed; left: 0; right: 0; top: 40%; text-align: center;
              font: 16px -apple-system, "Helvetica Neue", sans-serif; color: #222; }
  </style>
-@@ -31,7 +33,10 @@
+@@ -31,7 +34,10 @@
  <div id="status">Loading TeXmacs Upsilon…</div>
  <script>
    var statusElement = document.getElementById('status');
-+  var embedded = '@TM_EMBEDDED@' === 'true';
++  var embedded = document.querySelector('meta[name="tessera-embedded"]').content === 'true';
 +  if (embedded) document.documentElement.classList.add('tessera-embedded');
    var Module = {
 +    tmEmbedded: embedded,
@@ -151,7 +164,7 @@ diff --git a/src/misc/wasm/web-pre.js b/src/misc/wasm/web-pre.js
 @@ -513,7 +519,7 @@
      });
    }
- 
+
 -  if (typeof window !== 'undefined') {
 +  if (typeof window !== 'undefined' && !Module['tmEmbedded']) {
      window.addEventListener ('pagehide', function () { flush (); });
@@ -197,7 +210,7 @@ diff --git a/src/misc/wasm/frame.js b/src/misc/wasm/frame.js
 @@ -1358,7 +1366,7 @@
      placeMenu ();
    }
- 
+
 -  if (typeof document !== 'undefined') {
 +  if (typeof document !== 'undefined' && !Module['tmEmbedded']) {
      if (document.readyState === 'loading') document.addEventListener ('DOMContentLoaded', build);
@@ -222,7 +235,7 @@ diff --git a/src/misc/wasm/files.js b/src/misc/wasm/files.js
 -  if (typeof window !== 'undefined' && typeof tmProgress !== 'undefined')
 +  if (typeof window !== 'undefined' && typeof tmProgress !== 'undefined' && !Module['tmEmbedded'])
      tmProgress.running (function () { setTimeout (remind, 8000); });
- 
+
    // the bytes of a backup -> { note, entries: [{ rel (in the home), bytes }] };
 @@ -949,7 +949,7 @@
        }).catch (function (err) { console.error ('TeXmacs: the drop failed', err); });
@@ -230,15 +243,27 @@ diff --git a/src/misc/wasm/files.js b/src/misc/wasm/files.js
    }
 -  if (typeof window !== 'undefined') installDrop ();
 +  if (typeof window !== 'undefined' && !Module['tmEmbedded']) installDrop ();
- 
+
    /****************************************************************************
    * A document from the web: texmacs.html?open=<url>
 @@ -1029,7 +1029,7 @@
        });
    }
- 
+
 -  if (typeof location !== 'undefined') {
 +  if (typeof location !== 'undefined' && !Module['tmEmbedded']) {
      var address = new URLSearchParams (location.search);
      var opened = address.get ('open') ? openFromWeb (address.get ('open')) : Promise.resolve ();
      if (address.get ('file')) {
+diff --git a/src/misc/wasm/build-info.py b/src/misc/wasm/build-info.py
+--- a/src/misc/wasm/build-info.py
++++ b/src/misc/wasm/build-info.py
+@@ -14,7 +14,7 @@
+ import hashlib, json, os, re, shutil, subprocess, sys, time
+
+ src, build, mupdf, thorvg, out = sys.argv[1:6]
+-web = os.path.join (build, 'out', 'web')
++web = os.path.join (build, sys.argv[6] if len (sys.argv) > 6 else 'out/web')
+
+ def read (p):
+   try:
