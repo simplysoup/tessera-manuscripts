@@ -16,7 +16,7 @@ const engineFiles = new Set([
   ...[16, 32, 64, 128, 192, 256, 512].map(size => "texmacs-vue-" + size + ".png"),
   ...packGzip.values(),
 ]);
-const appFiles = new Set(["index.html", "style.css", "workspace.js", "documents.js", "engine.js", "mark.svg"]);
+const appFiles = new Set(["index.html", "style.css", "workspace.js", "documents.js", "engine.js", "sharing.js", "mark.svg"]);
 const examples = new Set(["nested-derivation.tm", "nested-import.tex"]);
 const upstream = "https://mgubi.github.io/texmacs/";
 const types = {

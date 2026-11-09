@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node scripts/serve.mjs",
-    "test": "node --test test/server.test.mjs test/collaboration/room.test.mjs",
+    "test": "node --test test/server.test.mjs test/sharing.test.mjs test/collaboration/room.test.mjs",
     "test:browser": "node test/browser.mjs",
     "test:collaboration": "node test/collaboration/browser.mjs",
     "build": "node scripts/build-static.mjs"

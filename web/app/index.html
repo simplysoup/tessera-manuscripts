@@ -16,7 +16,7 @@
     <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
     <symbol id="upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5"/></symbol>
     <symbol id="arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
-    <symbol id="back" viewBox="0 0 24 24"><path d="M20 12H5m6-6-6 6 6 6"/></symbol>
+    <symbol id="arrow-back" viewBox="0 0 24 24"><path d="M20 12H5m6-6-6 6 6 6"/></symbol>
     <symbol id="paper" viewBox="0 0 24 24"><path d="M5 3h9l5 5v13H5zM14 3v6h5M8 13h8m-8 4h6"/></symbol>
     <symbol id="math" viewBox="0 0 24 24"><path d="M18 5H6l6 7-6 7h12M18 5v3m0 11v-3"/></symbol>
     <symbol id="code" viewBox="0 0 24 24"><path d="m8 6-6 6 6 6m8-12 6 6-6 6m-2-14-4 16"/></symbol>
@@ -24,6 +24,7 @@
     <symbol id="down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
     <symbol id="help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1 .7-1.5 1.4-1.5 2.5m0 3h.01"/></symbol>
     <symbol id="edit" viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L20 8l-4-4L4 16Zm10-10 4 4"/></symbol>
+    <symbol id="share-icon" viewBox="0 0 24 24"><path d="M12 15V3m-4 4 4-4 4 4M5 11v9h14v-9"/></symbol>
     <symbol id="trash" viewBox="0 0 24 24"><path d="M3 6h18m-14 0V3h10v3m2 0-1 15H6L5 6m5 4v7m4-7v7"/></symbol>
   </svg>
   <section id="library" class="library">
@@ -70,7 +71,7 @@
   <section id="studio" class="studio" hidden aria-label="Manuscript editor">
     <header class="editor-header">
       <div class="editor-left">
-        <button id="back" class="icon-button editor-back" aria-label="Back to manuscripts"><svg><use href="#back"/></svg></button>
+        <button id="back" class="button outline editor-back" aria-label="Back to manuscripts"><svg><use href="#arrow-back"/></svg><span>Manuscripts</span></button>
         <div class="editor-name"><div class="eyebrow">MANUSCRIPT STUDIO</div><button id="rename" class="title-button" disabled aria-label="Rename manuscript"><span id="title"></span><svg><use href="#edit"/></svg></button></div>
       </div>
       <div class="editor-actions">
@@ -79,14 +80,39 @@
         <button id="tools" class="button outline" type="button" aria-pressed="false" disabled>Tools</button>
         <button id="source-mode" class="button outline" type="button" aria-pressed="false" disabled><svg><use href="#code"/></svg><span>Source</span></button>
         <button id="save" class="button outline" type="button" disabled>Save</button>
-        <details id="exports" class="exports"><summary class="button dark" aria-disabled="true">Export <svg><use href="#down"/></svg></summary><div class="export-menu"><button data-format="pdf">PDF <span>.pdf</span></button><button data-format="latex">LaTeX <span>.tex</span></button><button data-format="texmacs">TeXmacs <span>.tm</span></button></div></details>
+        <details id="exports" class="exports"><summary class="button outline" aria-disabled="true">Export <svg><use href="#down"/></svg></summary><div class="export-menu"><button data-format="pdf">PDF <span>.pdf</span></button><button data-format="latex">LaTeX <span>.tex</span></button><button data-format="texmacs">TeXmacs <span>.tm</span></button></div></details>
+        <button id="share" class="button dark" disabled><svg><use href="#share-icon"/></svg> Share</button>
       </div>
     </header>
-    <div id="editor-host" class="editor-host"></div>
-    <footer class="editor-footer"><span><span class="small-dot"></span> Local draft</span><span id="editor-hint">Your manuscript is stored in this browser.</span></footer>
+    <main class="writing-desk">
+      <div class="desk-label"><span>THE WRITING ROOM</span><span id="mode-label">TYPESET VIEW</span></div>
+      <div class="paper-frame">
+        <div id="editor-host" class="editor-host" data-ready="false" inert></div>
+        <div id="editor-cover" class="editor-cover" role="status">
+          <span class="cover-mark"><svg><use href="#logo"/></svg></span>
+          <h2 id="cover-title">Opening your manuscript</h2>
+          <p id="cover-copy">Getting the writing room ready.</p>
+        </div>
+      </div>
+    </main>
+    <footer class="editor-footer"><span><span class="small-dot"></span> Local draft</span><span id="editor-context"></span><span id="editor-hint">Your manuscript is stored in this browser.</span></footer>
   </section>
   <input type="file" id="file" accept=".tex,.tm" hidden>
   <dialog id="dialog"><form method="dialog" id="dialog-form"><div class="eyebrow" id="dialog-label"></div><h2 id="dialog-title"></h2><p id="dialog-copy"></p><label id="name-field" hidden>Manuscript name<input id="name" maxlength="90" autocomplete="off"></label><div class="dialog-actions"><button class="button outline" value="cancel" type="submit" formnovalidate>Cancel</button><button class="button dark" id="dialog-confirm" value="confirm" type="submit">Done</button></div></form></dialog>
+  <dialog id="share-dialog" aria-labelledby="share-title">
+    <form method="dialog">
+      <div class="eyebrow">MANUSCRIPT SHARING</div><h2 id="share-title">Share a copy</h2>
+      <p>A copy opens as a new, editable draft. Each person’s changes stay in their own copy.</p>
+      <div class="share-panel">
+        <label for="copy-link">Editable copy link</label>
+        <p id="copy-help">The link contains your manuscript. Send it only to people you trust who can sign in to this private workspace.</p>
+        <div class="copy-row"><input id="copy-link" type="text" readonly aria-describedby="copy-help" placeholder="Preparing link…"><button id="copy-link-button" type="button" class="button dark" disabled>Copy link</button></div>
+        <button id="share-download" type="button" class="button outline">Download .tm for anyone</button>
+      </div>
+      <div class="share-live"><strong>Live collaboration</strong><span>Live invitations aren’t available yet.</span></div>
+      <div class="dialog-actions"><button class="button outline" value="close">Done</button></div>
+    </form>
+  </dialog>
   <div id="notice" class="notice" role="status" hidden></div>
 </body>
 </html>

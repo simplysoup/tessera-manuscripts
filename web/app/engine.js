@@ -17,33 +17,74 @@ const inserts = {
 };
 const suffixes = { texmacs: "tm", latex: "tex", pdf: "pdf" };
 
-export async function mountEditor(host, draft, signal) {
+let running;
+let priorUrl;
+
+export function warmAssets() {
+  if (navigator.connection?.saveData || /(^|-)2g$/u.test(navigator.connection?.effectiveType ?? "")) return;
+  // These match the URLs requested by the pinned upstream boot loader.
+  const prefetch = href => {
+    const link = document.createElement("link");
+    link.rel = "prefetch";
+    link.href = href;
+    document.head.append(link);
+  };
+  prefetch("/texmacs.js");
+  prefetch("/texmacs.wasm.gz");
+  fetch("/texmacs-files.json").then(response => response.json()).then(manifest => {
+    for (const pack of manifest.packages) if (pack.boot) prefetch("/" + pack.gz);
+  }).catch(() => {});
+}
+
+function boot(host) {
+  if (running) return running;
   const iframe = document.createElement("iframe");
   iframe.title = "TeXmacs manuscript editor";
-  const query = new URLSearchParams({ bars: "top" });
+  iframe.tabIndex = -1;
+  const query = new URLSearchParams({ bars: "top", tessera: "1" });
   if (new URLSearchParams(location.search).get("gpu") === "0") query.set("gpu", "0");
   iframe.src = "/texmacs.html?" + query;
   host.replaceChildren(iframe);
 
-  const engine = () => iframe.contentWindow;
-  await until(() => typeof engine()?.tmProgress?.running === "function", signal, "The editor could not load.");
-  let started = false;
-  engine().tmProgress.running(() => { started = true; });
-  await until(() => started, signal, "TeXmacs did not finish starting. Try opening the manuscript again.");
-  const runtime = engine();
+  running = (async () => {
+    const signal = new AbortController().signal;
+    const engine = () => iframe.contentWindow;
+    await until(() => typeof engine()?.tmProgress?.running === "function", signal, "The editor could not load.");
+    let started = false;
+    engine().tmProgress.running(() => { started = true; });
+    await until(() => started, signal, "The editor did not finish starting. Try opening the manuscript again.");
+    const runtime = engine();
+    runtime.FS.mkdirTree("/tmp/tessera");
+    return { runtime, iframe };
+  })().catch(error => {
+    iframe.remove();
+    running = undefined;
+    priorUrl = undefined;
+    throw error;
+  });
+  return running;
+}
+
+export async function mountEditor(host, draft, signal) {
+  const { runtime, iframe } = await boot(host);
+  signal.throwIfAborted();
   const call = code => {
     const result = runtime.TeXmacs.scheme(code);
     if (result.startsWith("(error ")) throw new Error("TeXmacs could not complete this action.");
     return result;
   };
   const current = () => call("(url->string (current-buffer-url))");
-  runtime.FS.mkdirTree("/tmp/tessera");
-  const path = "/tmp/tessera/" + draft.id + "." + draft.format;
+  const path = "/tmp/tessera/" + crypto.randomUUID() + "." + draft.format;
   const url = `(string->url ${JSON.stringify(path)})`;
+  const previous = priorUrl;
+  priorUrl = { url, path };
   runtime.FS.writeFile(path, draft.bytes);
-  call('(set-preference "interactive footer" "on")');
-  runtime.TeXmacs.later(`(load-buffer-in-new-window ${url})`);
+  runtime.TeXmacs.later(`(load-buffer ${url} :strict)`);
   await until(() => current() === path, signal, "TeXmacs could not open this manuscript.", 16000);
+  if (previous) {
+    call(`(if (buffer-exists? ${previous.url}) (cpp-buffer-close ${previous.url}))`);
+    runtime.FS.unlink(previous.path);
+  }
 
   function exportFile(format) {
     const suffix = suffixes[format];
@@ -60,8 +101,9 @@ export async function mountEditor(host, draft, signal) {
 
   function setTools(visible) {
     const value = visible ? "#t" : "#f";
-    call(`(begin (show-icon-bar 0 ${value}) (show-icon-bar 1 ${value}) (show-icon-bar 2 ${value}))`);
-    runtime.document.getElementById("tm-frame").style.display = visible ? "" : "none";
+    call(`(begin (show-header ${value}) (show-footer ${value})
+      (show-icon-bar 0 ${value}) (show-icon-bar 1 ${value}) (show-icon-bar 2 ${value}))`);
+    runtime.document.documentElement.toggleAttribute("data-tessera-tools", visible);
     runtime.dispatchEvent(new runtime.Event("resize"));
   }
   function requireManuscript() {
@@ -83,7 +125,13 @@ export async function mountEditor(host, draft, signal) {
       iframe.focus();
     },
     active: () => current() === path,
-    dirty: () => call(`(buffer-modified? ${url})`) === "#t",
+    dirty: () => call(`(and (buffer-exists? ${url}) (buffer-modified? ${url}))`) === "#t",
+    context() {
+      if (current() !== path) return "";
+      return call(`(string-join (map (lambda (node) (symbol->string (tree-label node)))
+        (list-filter (reverse (upward-context-trees (cursor-tree)))
+          (lambda (node) (not (in? (tree-label node) '(document concat)))))) " › ")`);
+    },
     capture() {
       const bytes = exportFile("texmacs");
       call(`(buffer-pretend-saved ${url})`);
