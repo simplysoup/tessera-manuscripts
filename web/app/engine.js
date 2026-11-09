@@ -1,4 +1,5 @@
 import { installRoom } from "./native-room.js";
+import { installShortcuts } from "./shortcuts.js";
 
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
@@ -75,7 +76,7 @@ function boot(host) {
   return running;
 }
 
-export async function mountEditor(host, draft, signal) {
+export async function mountEditor(host, draft, signal, { onShortcut, shortcutHint }) {
   const { runtime, iframe } = await boot(host);
   signal.throwIfAborted();
   const call = code => {
@@ -124,6 +125,13 @@ export async function mountEditor(host, draft, signal) {
   }
   rename(draft.title);
   setTools(false);
+  installShortcuts(runtime, {
+    command: onShortcut,
+    replay: key => runtime.TeXmacs.later(`(key-press ${JSON.stringify(key)})`),
+    hint: shortcutHint,
+    active: () => !host.inert && current() === path,
+    signal,
+  });
 
   return {
     setTools,

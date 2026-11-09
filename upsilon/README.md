@@ -16,6 +16,12 @@ renderers. The second adds an embedded build profile for Tessera's frontend.
 | The Scheme runtime and the browser APIs Tessera uses to load buffers and edit | AI, Python, R, TikZ, and Asymptote session plug-ins, their browser worker and wallet glue, and the font sample PDFs |
 | Native dialogs used by the editor and clipboard | Public site pages, screenshots, and external computational runtime builds |
 
+The third patch gives the embedded editor a green, font-sized caret and
+draws clickable guides for empty arguments of the fraction at the caret.
+The guides are editor overlays and leave document layout and export intact.
+Tessera owns the F2 command prefix, with direct toolbar bindings and a
+native key entry mode for chords that the browser reserves.
+
 The full Upsilon web target retains its own storage, tabs, and plug-ins.
 Tessera's frontend owns document persistence. Native preferences in the
 embedded runtime are transient. The build still includes the C++ editor,
@@ -33,8 +39,9 @@ binary listed in [PORT.md](../docs/PORT.md).
 From the Upsilon checkout, with `TESSERA_REPO` pointing to this repository:
 
 ```sh
-git apply --check "$TESSERA_REPO"/upsilon/000*.patch
-git apply "$TESSERA_REPO"/upsilon/000*.patch
+for patch in "$TESSERA_REPO"/upsilon/000*.patch; do
+  git apply --check "$patch" && git apply "$patch" || exit 1
+done
 cd src
 mkdir -p build-wasm
 sh misc/wasm/build-mupdf.sh 1.28.5

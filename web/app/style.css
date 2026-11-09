@@ -172,5 +172,8 @@ dialog input{border:1px solid #a8baab;border-radius:7px;padding:8px;color:var(--
   .ribbon-group{padding-inline:6px}
 }
 @media(max-width:480px){
-  .desk-label-prefix,#mode-label{display:none}
+  .desk-label-prefix,#mode-label,#shortcut-label{display:none}
 }
+
+#shortcut-hint:empty{visibility:hidden}
+#shortcut-hint{margin:0;pointer-events:none}

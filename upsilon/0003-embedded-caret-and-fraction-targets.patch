@@ -1,0 +1,176 @@
+--- a/src/misc/wasm/web-pre.js
++++ b/src/misc/wasm/web-pre.js
+@@ -169,6 +169,7 @@
+   // The host application persists manuscripts. Give each embedded editor
+   // its own transient preferences and skip the standalone home lock.
+   if (Module['tmEmbedded']) {
++    ENV['TEXMACS_TESSERA_EDITOR'] = '1';
+     FS.mkdirTree ('/home/web/.TeXmacs');
+     return;
+   }
+--- a/src/src/Edit/Interface/edit_interface.cpp
++++ b/src/src/Edit/Interface/edit_interface.cpp
+@@ -1328,6 +1328,18 @@
+     invalidate (ncr->x1, ncr->y1, ncr->x2, ncr->y2);
+     copy_always= rectangles (ncr, copy_always);
+     oc= copy (cu);
++
++    path slots[2];
++    rectangle bounds[2];
++    empty_fraction_targets (slots, bounds);
++    rectangles targets;
++    for (int i= 0; i < 2; i++)
++      if (!is_nil (slots[i])) targets= rectangles (bounds[i], targets);
++    if (targets != fraction_targets || (env_change & THE_FOCUS)) {
++      invalidate (thicken (fraction_targets, zpixel, zpixel));
++      invalidate (thicken (targets, zpixel, zpixel));
++      fraction_targets= targets;
++    }
+    
+     // set hot spot in the gui
+     send_cursor (this, (SI) floor (cu->ox * magf),
+--- a/src/src/Edit/Interface/edit_interface.hpp
++++ b/src/src/Edit/Interface/edit_interface.hpp
+@@ -83,6 +83,7 @@
+   rectangle     last_extents;
+   rectangles    env_rects;
+   rectangles    foc_rects;
++  rectangles    fraction_targets;
+   rectangles    sem_rects;
+   bool          sem_correct;
+   cursor        oc;
+@@ -142,6 +143,7 @@
+   void draw_context (renderer ren, rectangle r);
+   void draw_env (renderer ren);
+   void draw_cursor (renderer ren);
++  void empty_fraction_targets (path* slots, rectangle* bounds);
+   bool user_cursor_shape (int i, font& fn, string& name, SI& x1, SI& y1,
+                           SI& x2, SI& y2, SI& fw, SI& fh);
+   void invalidate_user_cursor (int i);
+--- a/src/src/Edit/Interface/edit_mouse.cpp
++++ b/src/src/Edit/Interface/edit_mouse.cpp
+@@ -17,6 +17,7 @@
+ #include "drd_mode.hpp"
+ #include "message.hpp"
+ #include "window.hpp"
++#include "sys_utils.hpp"
+
+   // These are tm-defined in graphics-utils.scm (looks like they shouldn't)
+ #define ShiftMask     256
+@@ -152,8 +153,58 @@
+ }
+
+ void
++edit_interface_rep::empty_fraction_targets (path* slots, rectangle* bounds) {
++  static const bool tessera_editor= get_env ("TEXMACS_TESSERA_EDITOR") == "1";
++  if (!tessera_editor || !got_focus || full_screen || is_nil (eb)) return;
++
++  // Offer targets for the innermost fraction containing the caret.
++  for (path p= path_up (tp); rp <= p; p= path_up (p)) {
++    tree t= subtree (et, p);
++    if (is_compound (t) && N(t) == 2 &&
++        (is_func (t, FRAC) || is_compound (t, "tfrac") ||
++         is_compound (t, "dfrac") || is_compound (t, "frac*") ||
++         is_compound (t, "cfrac"))) {
++      cursor num= eb->find_check_cursor (start (et, p * 0));
++      cursor den= eb->find_check_cursor (start (et, p * 1));
++      if (!num->valid || !den->valid) return;
++      SI split= (num->oy + num->y1 + den->oy + den->y2) / 2;
++      SI half_width= 8 * zpixel;
++      for (int i= 0; i < 2; i++) {
++        if (t[i] != "") continue;
++        cursor c= i == 0 ? num : den;
++        SI bottom= c->oy + c->y1 - 2*zpixel;
++        SI top= c->oy + c->y2 + 2*zpixel;
++        if (i == 0) bottom= max (bottom, split + zpixel);
++        else top= min (top, split - zpixel);
++        if (bottom >= top) continue;
++        bounds[i]= rectangle (c->ox - half_width, bottom,
++                              c->ox + half_width, top);
++        slots[i]= p * i * 0;
++      }
++      return;
++    }
++    if (p == rp) break;
++  }
++}
++
++void
+ edit_interface_rep::mouse_select (SI x, SI y, int mods, bool drag) {
+   if (mouse_message ("select" , x, y)) return;
++  if (!drag && (mods & (ShiftMask | ControlMask | Mod1Mask | Mod2Mask)) == 0) {
++    path slots[2];
++    rectangle bounds[2];
++    empty_fraction_targets (slots, bounds);
++    for (int i= 0; i < 2; i++) {
++      rectangle r= bounds[i];
++      if (!is_nil (slots[i]) && r->x1 <= x && x <= r->x2 &&
++          r->y1 <= y && y <= r->y2) {
++        go_to (slots[i]);
++        set_selection (tp, tp);
++        notify_change (THE_SELECTION);
++        return;
++      }
++    }
++  }
+   if (!is_nil (mouse_ids) && (mods & (ShiftMask+Mod2Mask)) == 0 && !drag) {
+     call ("link-follow-ids", object (mouse_ids), object ("click"));
+     disable_double_clicks ();
+--- a/src/src/Edit/Interface/edit_repaint.cpp
++++ b/src/src/Edit/Interface/edit_repaint.cpp
+@@ -13,6 +13,7 @@
+ #include "message.hpp"
+ #include "analyze.hpp"
+ #include "gui.hpp" // for gui_interrupted
++#include "sys_utils.hpp"
+
+ extern int nr_painted;
+ extern void clear_pattern_rectangles (renderer ren, rectangle m, rectangles l);
+@@ -81,6 +82,10 @@
+       }
+       ren->draw_rectangles (sem_rects);
+     }
++    if (!is_nil (fraction_targets)) {
++      ren->set_pencil (pencil (rgb_color (99, 139, 121, 190), ren->pixel));
++      ren->draw_selection (fraction_targets);
++    }
+   }
+ }
+
+@@ -90,6 +95,15 @@
+       !temp_invalid_cursor && (got_focus || full_screen)) {
+     cursor cu= get_cursor();
+     if (!inside_active_graphics ()) {
++      static const bool tessera_editor=
++        get_env ("TEXMACS_TESSERA_EDITOR") == "1";
++      if (tessera_editor) {
++        SI x1= cu->ox + (SI) (cu->y1 * cu->slope);
++        SI x2= cu->ox + (SI) (cu->y2 * cu->slope);
++        ren->set_pencil (pencil (rgb_color (24, 68, 57), 2*zpixel));
++        ren->line (x1, cu->oy + cu->y1, x2, cu->oy + cu->y2);
++        return;
++      }
+       SI dw= 0;
+       if (tremble_count > 3) dw= min (tremble_count - 3, 25) * pixel;
+       cu->y1 -= 2*zpixel + dw; cu->y2 += 2*zpixel + dw;
+--- a/src/src/Typeset/Boxes/Basic/text_boxes.cpp
++++ b/src/src/Typeset/Boxes/Basic/text_boxes.cpp
+@@ -13,6 +13,7 @@
+ #include "font.hpp"
+ #include "Boxes/construct.hpp"
+ #include "analyze.hpp"
++#include "sys_utils.hpp"
+
+ /******************************************************************************
+ * Text boxes
+@@ -321,7 +322,9 @@
+     if (l == N(str)) cu->ox += xk->right;
+     STACK_DELETE_ARRAY (xpos);
+   }
+-  if (l != 0) {
++  static const bool tessera_editor= get_env ("TEXMACS_TESSERA_EDITOR") == "1";
++  if (tessera_editor) fn->get_extents ("Hg", ex);
++  else if (l != 0) {
+     int k= l;
+     tm_char_backwards (str, k);
+     fn->get_extents (str (k, l), ex);

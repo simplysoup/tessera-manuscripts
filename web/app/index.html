@@ -113,6 +113,7 @@
       <div class="desk-label">
         <div class="desk-context"><span class="desk-label-prefix">AT THE CURSOR</span><span id="editor-context">Document</span></div>
         <div class="desk-views">
+          <span id="shortcut-label" title="Press F2 while editing, then a command key. Hover over a toolbar control to see its key.">F2 SHORTCUTS</span>
           <span id="mode-label">TYPESET VIEW</span>
           <button id="source-mode" class="view-switch" type="button" aria-pressed="false" disabled><svg><use href="#code"/></svg> Source</button>
           <details id="advanced-tools" class="exports">
@@ -122,6 +123,7 @@
         </div>
       </div>
       <div class="paper-frame">
+        <p id="shortcut-hint" class="notice" role="status"></p>
         <div id="editor-host" class="editor-host" data-ready="false" inert></div>
         <div id="editor-cover" class="editor-cover" role="status">
           <span class="cover-mark"><svg><use href="#logo"/></svg></span>

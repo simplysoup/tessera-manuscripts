@@ -1,5 +1,6 @@
 import { documents, claim } from "./documents.js";
 import { mountEditor, warmAssets } from "./engine.js";
+import { commandKeys } from "./shortcuts.js";
 import { readCopyLink } from "./sharing.js";
 import { connectRoom, createLink, linkUrl, readLink } from "./live.js";
 
@@ -207,7 +208,10 @@ async function openDraft(id, shared) {
     studioUrl(id, room);
     status("Opening editor", "busy");
     enable(false);
-    session.editor = await mountEditor($("editor-host"), draft, session.controller.signal);
+    session.editor = await mountEditor($("editor-host"), draft, session.controller.signal, {
+      onShortcut: insert,
+      shortcutHint: message => { $("shortcut-hint").textContent = message; },
+    });
     if (state !== session) return;
     if (room) {
       session.room = connectRoom(id, session.editor, (message, kind, error) => {
@@ -404,10 +408,17 @@ for (const id of ["exports", "advanced-tools"]) {
     if ($(id).open) $(id === "exports" ? "advanced-tools" : "exports").open = false;
   });
 }
-document.querySelectorAll("[data-insert]").forEach(button => button.addEventListener("click", () => {
-  try { state.editor.insert(button.dataset.insert); }
+function insert(kind) {
+  try { state.editor.insert(kind); }
   catch (error) { notice(error.message); }
-}));
+}
+
+for (const button of document.querySelectorAll("[data-insert]")) {
+  const kind = button.dataset.insert;
+  const label = button.getAttribute("aria-label") || button.textContent.trim();
+  button.title = `${label} (F2 then ${commandKeys[kind].toUpperCase()})`;
+  button.addEventListener("click", () => insert(kind));
+}
 function download(session, format) {
   const [suffix, type] = formats[format];
   const url = URL.createObjectURL(new Blob([session.editor.exportFile(format)], { type }));
