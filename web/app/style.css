@@ -76,7 +76,10 @@ h1,h2{font-family:var(--serif);font-weight:400;letter-spacing:-.052em;margin:0}
 .editor-back{margin-right:4px;flex:none}
 .title-button{max-width:min(48vw,380px);border:0;background:transparent;display:flex;align-items:center;gap:6px;padding:2px 0;color:inherit;font-size:17px;font-weight:650;text-align:left}
 .title-button svg{width:13px;color:var(--muted)}
-.save-status{display:flex;align-items:center;gap:5px;margin-right:4px}
+.save-status{display:grid;grid-template-columns:7px auto;align-items:center;column-gap:5px;margin-right:4px;flex:none;white-space:nowrap}
+.save-status-width,.save-status-label{grid-area:1/2}
+.save-status-width{visibility:hidden}
+.save-status-label{contain:inline-size;overflow:hidden;text-overflow:ellipsis}
 .save-status[data-state=error]>span:first-child{background:#b45134}
 .save-status[data-state=busy]>span:first-child{background:#a57c39}
 #source-mode[aria-pressed=true]{background:#d9eadb;border-color:#93b29d}

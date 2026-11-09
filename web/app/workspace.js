@@ -40,8 +40,12 @@ function notice(message) {
 }
 
 function status(message, kind = "") {
-  if ($("save-status").lastElementChild.textContent !== message) $("save-status").lastElementChild.textContent = message;
-  $("save-status").dataset.state = kind;
+  const indicator = $("save-status");
+  if (indicator.lastElementChild.textContent !== message) {
+    indicator.lastElementChild.textContent = message;
+    indicator.title = message;
+  }
+  indicator.dataset.state = kind;
 }
 
 function icon(name) {
