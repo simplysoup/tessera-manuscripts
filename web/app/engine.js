@@ -15,7 +15,10 @@ async function until(check, signal, failure, timeout = 45000) {
 
 const inserts = {
   equation: "(make 'equation*)",
+  inlineMath: "(make 'math)",
+  equations: "(make-eqnarray*)",
   section: "(make-section 'section)",
+  subsection: "(make-section 'subsection)",
   theorem: "(make 'theorem)",
   fraction: "(make-fraction)",
   root: "(make-sqrt)",
@@ -23,6 +26,16 @@ const inserts = {
   subscript: "(make-script #f #t)",
   bold: "(make-with \"font-series\" \"bold\")",
   italic: "(make-with \"font-shape\" \"italic\")",
+  matrix: "(make 'matrix)",
+  table: "(make 'tabular)",
+  label: "(make-label)",
+  reference: "(make 'reference)",
+  pageReference: "(make 'pageref)",
+  citation: "(make 'cite)",
+  footnote: "(make 'footnote)",
+  macro: "(open-macro-editor \"\" :global)",
+  contextMacro: "(create-context-macro \"\" :global)",
+  tableMacro: "(create-table-macro \"\" :global)",
   undo: "(undo 0)",
   redo: "(redo 0)",
 };
@@ -168,6 +181,12 @@ export async function mountEditor(host, draft, signal, { onShortcut, shortcutHin
       if (!Object.hasOwn(inserts, kind)) throw new Error("Unknown structure.");
       runtime.TeXmacs.later(inserts[kind]);
       iframe.focus();
+    },
+    command(code) {
+      requireManuscript();
+      const result = call(code);
+      iframe.focus();
+      return result;
     },
     active: () => current() === path,
     recentlyActive,

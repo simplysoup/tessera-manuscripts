@@ -1,7 +1,9 @@
-import { documents, claim } from "./documents.js";
+import { documents, claim, accountState } from "./documents.js";
 import { mountEditor, warmAssets } from "./engine.js";
 import { readCopyLink } from "./sharing.js";
 import { connectRoom, createLink, linkUrl, readLink } from "./live.js";
+import { searchEditor, editorTutorials } from "./command-search.js";
+import { commandKeys } from "./shortcuts.js";
 
 const $ = id => document.getElementById(id);
 const utf8 = new TextEncoder();
@@ -158,7 +160,7 @@ $("dialog").addEventListener("close", async () => {
 });
 
 function enable(ready) {
-  for (const id of ["rename", "save", "share"]) $(id).disabled = !ready;
+  for (const id of ["rename", "save", "share", "feature-search"]) $(id).disabled = !ready;
   $("rename").disabled ||= Boolean(state?.draft?.room);
   const exports = $("exports");
   exports.firstElementChild.setAttribute("aria-disabled", String(!ready));
@@ -188,7 +190,7 @@ async function openDraft(id, shared, { replaceId } = {}) {
       if (!local) throw new Error("This manuscript is unavailable in this browser.");
     }
     const draft = room ? {
-      ...await readLink("room", roomId, session.controller.signal), id: local?.id ?? roomId,
+      ...await readLink("room", roomId, session.controller.signal), id: roomId,
       roomId, room: true, updated: Date.now(),
     } : local;
     session.draft = draft;
@@ -281,7 +283,7 @@ function save(session, force = false) {
     await documents.put(next);
     session.draft = next;
     session.retry = false;
-    if (state === session) status(session.editor.dirty() ? "Unsaved changes" : "Saved here");
+    if (state === session) status(session.editor.dirty() ? "Unsaved changes" : "Saved");
   })().catch(error => {
     session.retry = true;
     if (state === session) status("Save failed", "error");
@@ -347,7 +349,22 @@ function syncView(editor) {
 }
 
 $("new").addEventListener("click", () => createDraft(templates.blank));
+$("account").addEventListener("click", async () => {
+  try {
+    await accountState.logout();
+    state = undefined;
+    cache = [];
+    $("library").hidden = true;
+    $("studio").hidden = true;
+    $("auth-screen").hidden = false;
+    setAuthMode("login");
+  } catch (error) { notice(error.message); }
+});
 document.querySelectorAll("[data-template]").forEach(button => button.addEventListener("click", () => createDraft(templates[button.dataset.template])));
+document.querySelectorAll("[data-tutorial]").forEach(button => button.addEventListener("click", () => {
+  const tutorial = editorTutorials.find(item => item.id === button.dataset.tutorial);
+  if (tutorial) createDraft({ title: tutorial.title, format: "tm", path: tutorial.file });
+}));
 $("filter").addEventListener("input", showDrafts);
 $("import").addEventListener("click", () => $("file").click());
 $("file").addEventListener("change", async event => {
@@ -416,6 +433,88 @@ function insert(kind) {
   catch (error) { notice(error.message); }
 }
 
+const commandDialog = $("command-dialog");
+const commandQuery = $("command-query");
+const commandResults = $("command-results");
+let commandEntries = [];
+let selectedCommand = 0;
+
+function renderCommandResults() {
+  commandEntries = searchEditor(commandQuery.value);
+  selectedCommand = Math.min(selectedCommand, Math.max(0, commandEntries.length - 1));
+  commandResults.replaceChildren();
+  if (!commandEntries.length) {
+    const empty = document.createElement("div");
+    empty.className = "command-result-empty";
+    empty.textContent = "No matching tools or tutorials. Try “matrix”, “macro”, or “citation”.";
+    commandResults.append(empty);
+    return;
+  }
+  commandEntries.forEach(({ item }, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "command-result";
+    button.setAttribute("role", "option");
+    button.setAttribute("aria-selected", String(index === selectedCommand));
+    const title = document.createElement("span");
+    title.className = "command-result-title";
+    title.textContent = item.title;
+    const path = document.createElement("span");
+    path.className = "command-result-path";
+    path.textContent = item.path;
+    const detail = document.createElement("span");
+    detail.className = "command-result-description";
+    const commandKey = item.action ? commandKeys[item.action.slice("insert:".length)] : undefined;
+    detail.textContent = item.availability ?? (item.file
+      ? "Editable .tm lesson · Opens in the manuscript editor"
+      : item.category + (commandKey ? " · F2, then " + commandKey.toUpperCase() : " · " + item.path));
+    button.append(title, path, detail);
+    button.addEventListener("click", () => runCommandEntry(item));
+    commandResults.append(button);
+  });
+}
+
+async function openTutorial(item) {
+  if (state) {
+    await leave();
+    if (state) return;
+  }
+  await createDraft({ title: item.title, format: "tm", path: item.file });
+}
+
+function runCommandEntry(item) {
+  commandDialog.close();
+  if (item.file) {
+    openTutorial(item).catch(error => notice(error.message));
+    return;
+  }
+  if (item.action.startsWith("insert:")) insert(item.action.slice("insert:".length));
+}
+
+function openCommandSearch() {
+  if (!state?.editor) return;
+  commandQuery.value = "";
+  selectedCommand = 0;
+  renderCommandResults();
+  commandDialog.showModal();
+  commandQuery.focus();
+}
+
+$("feature-search").addEventListener("click", openCommandSearch);
+commandQuery.addEventListener("input", () => { selectedCommand = 0; renderCommandResults(); });
+commandQuery.addEventListener("keydown", event => {
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    if (!commandEntries.length) return;
+    selectedCommand = (selectedCommand + (event.key === "ArrowDown" ? 1 : commandEntries.length - 1)) % commandEntries.length;
+    renderCommandResults();
+    commandResults.querySelectorAll(".command-result")[selectedCommand]?.scrollIntoView({ block: "nearest" });
+  } else if (event.key === "Enter" && commandEntries[selectedCommand]) {
+    event.preventDefault();
+    runCommandEntry(commandEntries[selectedCommand].item);
+  }
+});
+
 function download(session, format) {
   const [suffix, type] = formats[format];
   const url = URL.createObjectURL(new Blob([session.editor.exportFile(format)], { type }));
@@ -439,8 +538,8 @@ function showShare(session) {
   $("room-link-row").hidden = !session.room;
   $("room-link").value = session.room ? linkUrl("room", session.draft.roomId) : "";
   $("room-help").textContent = session.room
-    ? "Anyone with workspace access and this invitation link can edit the same manuscript."
-    : "This changes the manuscript from private to shared. Anyone with workspace access and the invitation link can edit it.";
+    ? "Anyone who signs in and has this invitation link can edit the same manuscript."
+    : "This changes the manuscript from private to shared. Anyone who signs in and has this invitation link can edit it.";
   $("start-room").textContent = "Share & collaborate";
   $("start-copy").hidden = false;
   $("start-copy").disabled = false;
@@ -486,7 +585,7 @@ $("start-copy").addEventListener("click", async () => {
     $("copy-link").value = linkUrl("copy", id);
     $("copy-link-row").hidden = false;
     $("start-copy").hidden = true;
-    $("copy-help").textContent = "Anyone with this link and workspace access can open a separate editable draft.";
+    $("copy-help").textContent = "Anyone who signs in and has this link can open a separate editable draft.";
   } catch (error) {
     $("copy-help").textContent = error.message;
   } finally {
@@ -569,7 +668,33 @@ addEventListener("focus", () => {
   if (!state) refresh().catch(error => notice(error.message));
 });
 
-try {
+let authMode = "login";
+function setAuthMode(mode) {
+  authMode = mode;
+  const registering = mode === "register";
+  $("auth-login-tab").classList.toggle("selected", !registering);
+  $("auth-register-tab").classList.toggle("selected", registering);
+  $("auth-title").innerHTML = registering ? "Join the demo<span>.</span>" : "Welcome back<span>.</span>";
+  $("auth-copy").textContent = registering
+    ? "Create an account with the demo access code to save manuscripts across devices."
+    : "Sign in to open your manuscripts from any device.";
+  $("invite-field").hidden = !registering;
+  $("auth-invite").required = registering;
+  $("auth-password").minLength = registering ? 12 : 1;
+  $("auth-password").autocomplete = registering ? "new-password" : "current-password";
+  $("auth-submit").textContent = registering ? "Create account" : "Sign in";
+  $("auth-error").hidden = true;
+  $("auth-error").textContent = "";
+}
+
+async function enterWorkspace() {
+  const user = accountState.current();
+  if (!user) return;
+  $("auth-screen").hidden = true;
+  $("library").hidden = false;
+  $("account").textContent = user.local ? "Local user" : user.email;
+  $("account").title = user.local ? "Local development identity" : user.email + " · Sign out";
+  $("account").disabled = Boolean(user.local);
   await refresh();
   if (initialUrl.searchParams.has("room") || initialUrl.searchParams.has("copy") ||
       initialUrl.searchParams.get("open") === "copy" || initialUrl.hash.startsWith("#copy=")) {
@@ -580,6 +705,43 @@ try {
     if (requested) await openDraft(requested);
     else if (typeof requestIdleCallback === "function") requestIdleCallback(() => { if (!state) warmAssets(); });
   }
+}
+
+$("auth-login-tab").addEventListener("click", () => setAuthMode("login"));
+$("auth-register-tab").addEventListener("click", () => setAuthMode("register"));
+$("auth-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const submit = $("auth-submit");
+  const errorBox = $("auth-error");
+  submit.disabled = true;
+  submit.textContent = authMode === "register" ? "Creating account…" : "Signing in…";
+  errorBox.hidden = true;
+  try {
+    const email = $("auth-email").value;
+    const password = $("auth-password").value;
+    if (authMode === "register") await accountState.register(email, password, $("auth-invite").value);
+    else await accountState.login(email, password);
+    const manuscripts = await accountState.initialize();
+    if (!manuscripts) throw new Error("Your sign-in did not start a session. Please try again.");
+    await enterWorkspace();
+  } catch (error) {
+    errorBox.textContent = error.message;
+    errorBox.hidden = false;
+  } finally {
+    submit.disabled = false;
+    submit.textContent = authMode === "register" ? "Create account" : "Sign in";
+  }
+});
+
+try {
+  const manuscripts = await accountState.initialize();
+  if (manuscripts) await enterWorkspace();
+  else {
+    $("auth-screen").hidden = false;
+    $("library").hidden = true;
+  }
 } catch (error) {
-  notice("Browser storage is unavailable. " + error.message);
+  $("auth-screen").hidden = false;
+  $("auth-error").textContent = "Could not reach Tessera. " + error.message;
+  $("auth-error").hidden = false;
 }

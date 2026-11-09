@@ -27,12 +27,33 @@
     <symbol id="share-icon" viewBox="0 0 24 24"><path d="M12 15V3m-4 4 4-4 4 4M5 11v9h14v-9"/></symbol>
     <symbol id="trash" viewBox="0 0 24 24"><path d="M3 6h18m-14 0V3h10v3m2 0-1 15H6L5 6m5 4v7m4-7v7"/></symbol>
   </svg>
-  <section id="library" class="library">
+  <section id="auth-screen" class="auth-screen">
+    <a class="brand auth-brand" href="/" aria-label="Tessera home"><span class="brand-icon"><svg><use href="#logo"/></svg></span>Tessera</a>
+    <main class="auth-card">
+      <div class="eyebrow">A SMALL, PRIVATE DEMO</div>
+      <h1 id="auth-title">Welcome back<span>.</span></h1>
+      <p id="auth-copy">Sign in to open your manuscripts from any device.</p>
+      <div class="auth-tabs" role="group" aria-label="Account action">
+        <button id="auth-login-tab" class="selected" type="button">Sign in</button>
+        <button id="auth-register-tab" type="button">Create account</button>
+      </div>
+      <form id="auth-form">
+        <label>Email<input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254" required></label>
+        <label>Password<input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required></label>
+        <label id="invite-field" hidden>Demo access code<input id="auth-invite" name="invite" type="password" autocomplete="off" maxlength="128"></label>
+        <p id="auth-error" class="auth-error" role="alert" hidden></p>
+        <button id="auth-submit" class="button dark" type="submit">Sign in</button>
+      </form>
+      <p class="auth-footnote">Demo accounts are limited to invited participants. Email is used as your account name and is not verified.</p>
+    </main>
+    <span class="auth-caption">Made for thinking on paper.</span>
+  </section>
+  <section id="library" class="library" hidden>
     <header class="topbar">
       <div class="top-inner">
         <a class="brand" href="/" aria-label="Tessera home"><span class="brand-icon"><svg><use href="#logo"/></svg></span>Tessera</a>
         <span class="top-divider"></span><span class="top-section">Manuscript studio</span>
-        <div class="top-actions"><span class="local-pill"><span></span> Private by default</span><button class="icon-button" id="about" aria-label="Workspace help"><svg><use href="#help"/></svg></button></div>
+        <div class="top-actions"><span class="local-pill"><span></span> Private by default</span><button class="account-button" id="account" type="button" title="Sign out">Account</button><button class="icon-button" id="about" aria-label="Workspace help"><svg><use href="#help"/></svg></button></div>
       </div>
     </header>
     <main class="main">
@@ -60,6 +81,17 @@
           <button class="template" data-template="latex"><span class="template-icon apricot"><svg><use href="#code"/></svg></span><span class="template-text"><strong>LaTeX example</strong><span>See a .tex file become an editable page.</span></span><svg class="template-arrow"><use href="#arrow"/></svg></button>
         </div>
       </section>
+      <section class="section" aria-labelledby="tutorial-title">
+        <div class="section-head"><div><div class="eyebrow">GUIDED PRACTICE</div><h2 id="tutorial-title">Learn by editing</h2></div></div>
+        <div class="tutorial-cards">
+          <button class="tutorial-card" data-tutorial="matrix"><span class="tutorial-number">01</span><strong>Build a matrix</strong><span>Insert a matrix, navigate its cells, and nest math.</span></button>
+          <button class="tutorial-card" data-tutorial="macros"><span class="tutorial-number">02</span><strong>Make a reusable macro</strong><span>Create a custom notation and apply it in context.</span></button>
+          <button class="tutorial-card" data-tutorial="references"><span class="tutorial-number">03</span><strong>Link and cite</strong><span>Connect equations, sections, and sources.</span></button>
+          <button class="tutorial-card" data-tutorial="structure"><span class="tutorial-number">04</span><strong>Work with structure</strong><span>Build sections, theorems, proofs, and nested tags.</span></button>
+          <button class="tutorial-card" data-tutorial="formatting"><span class="tutorial-number">05</span><strong>Format and navigate</strong><span>Use native formatting and structural keyboard shortcuts.</span></button>
+          <button class="tutorial-card" data-tutorial="export"><span class="tutorial-number">06</span><strong>Move files in and out</strong><span>Import TeXmacs or LaTeX and export PDF or .tex.</span></button>
+        </div>
+      </section>
       <section class="section manuscripts" aria-labelledby="draft-title">
         <div class="section-head"><div><div class="eyebrow">02 / YOUR WORK</div><h2 id="draft-title">Manuscripts <span id="count" class="count" hidden></span></h2></div><label class="search"><svg><use href="#search"/></svg><input id="filter" type="search" aria-label="Find a manuscript" placeholder="Find a manuscript…"></label></div>
         <div id="drafts" class="drafts" aria-live="polite"></div>
@@ -77,6 +109,7 @@
         <button id="resume-manuscript" class="button outline" type="button" hidden>Return to manuscript</button>
       </div>
       <div class="editor-actions">
+        <button id="feature-search" class="button outline feature-search" type="button" disabled><svg><use href="#search"/></svg><span>Find a tool</span></button>
         <span id="save-status" class="save-status" role="status"><span aria-hidden="true"></span><span class="save-status-width" aria-hidden="true">Live · synced</span><span class="save-status-label">Opening</span></span>
         <button id="save" class="button outline" type="button" disabled>Save</button>
         <details id="exports" class="exports"><summary class="button outline" aria-disabled="true">Export <svg><use href="#down"/></svg></summary><div class="export-menu"><button data-format="pdf">PDF <span>.pdf</span></button><button data-format="latex">LaTeX <span>.tex</span></button><button data-format="texmacs">TeXmacs <span>.tm</span></button></div></details>
@@ -98,7 +131,7 @@
       <div class="desk-context">
         <span class="desk-label-prefix">AT THE CURSOR</span><span id="editor-context">Document</span>
       </div>
-      <span id="editor-hint">Your manuscript is stored in this browser.</span>
+      <span id="editor-hint">Your manuscript is saved to your account.</span>
       <div class="desk-views">
         <span id="shortcut-label" title="Press F2 while editing to see the shortcuts."><kbd>F2</kbd> Shortcuts</span>
         <span id="mode-label">TYPESET VIEW</span>
@@ -111,7 +144,7 @@
   <dialog id="share-dialog" aria-labelledby="share-title">
     <form method="dialog">
       <div class="eyebrow">MANUSCRIPT SHARING</div><h2 id="share-title">Share manuscript</h2>
-      <p>Send links to people with access to this private workspace.</p>
+      <p>People can join a shared manuscript with its invitation link. Your private manuscripts stay in your account.</p>
       <div class="share-panel">
         <label for="room-link">Edit together</label>
         <p id="room-help">Share this manuscript to let another person edit it with you.</p>
@@ -127,6 +160,12 @@
       </div>
       <div class="dialog-actions"><button class="button outline" value="close">Done</button></div>
     </form>
+  </dialog>
+  <dialog id="command-dialog" class="command-dialog" aria-labelledby="command-title">
+    <div class="command-search-head"><svg><use href="#search"/></svg><input id="command-query" type="search" autocomplete="off" placeholder="Search tools, tasks, and tutorials…" aria-label="Search editor functionality"><kbd>Esc</kbd></div>
+    <h2 id="command-title" class="visually-hidden">Find editor functionality</h2>
+    <div id="command-results" class="command-results" role="listbox" aria-label="Editor commands and tutorials"></div>
+    <p class="command-search-note">Choose a command to insert it at the cursor, or open an editable lesson.</p>
   </dialog>
   <div id="notice" class="notice" role="status" hidden></div>
 </body>

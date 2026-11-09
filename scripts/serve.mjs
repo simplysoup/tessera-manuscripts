@@ -20,8 +20,9 @@ const engineFiles = new Set([
   ...[16, 32, 64, 128, 192, 256, 512].map(size => "texmacs-vue-" + size + ".png"),
   ...packGzip.values(),
 ]);
-const appFiles = new Set(["index.html", "style.css", "workspace.js", "documents.js", "engine.js", "shortcuts.js", "native-room.js", "live.js", "sharing.js", "mark.svg"]);
+const appFiles = new Set(["index.html", "style.css", "workspace.js", "documents.js", "engine.js", "shortcuts.js", "native-room.js", "live.js", "sharing.js", "command-search.js", "mark.svg"]);
 const examples = new Set(["nested-derivation.tm", "nested-import.tex"]);
+const tutorials = new Set(["matrices.tm", "macros.tm", "references.tm", "structure.tm", "formatting.tm", "file-workflows.tm"]);
 const upstream = "https://mgubi.github.io/texmacs/";
 const types = {
   ".css": "text/css; charset=utf-8",
@@ -42,7 +43,9 @@ const types = {
 const downloads = new Map();
 
 const sqlite = new DatabaseSync(":memory:");
-sqlite.exec(await readFile(join(root, "drizzle/0000_manuscript_links.sql"), "utf8"));
+for (const migration of ["0000_manuscript_links.sql", "0001_account_manuscripts.sql", "0002_demo_accounts.sql"]) {
+  sqlite.exec(await readFile(join(root, "drizzle", migration), "utf8"));
+}
 const DB = {
   prepare(sql) {
     const statement = sqlite.prepare(sql);
@@ -91,6 +94,7 @@ async function load(path) {
     return readFile(join(root, "web/app", path === "/" ? "index.html" : file));
   }
   if (path === "/examples/" + file && examples.has(file)) return readFile(join(root, "web/examples", file));
+  if (path === "/tutorials/" + file && tutorials.has(file)) return readFile(join(root, "web/tutorials", file));
   if (path === "/legal/" || path === "/legal/index.html") return readFile(join(root, "web/legal/index.html"));
   if (path === "/legal/upsilon/" + file && /^(?:README\.md|000[1-7]-[a-z-]+\.patch)$/u.test(file)) {
     return readFile(join(root, "upsilon", file)).catch(error => {
@@ -141,10 +145,10 @@ const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, "http://" + request.headers.host);
     const path = decodeURIComponent(url.pathname);
-    if (path.startsWith("/api/manuscripts/")) {
+    if (path === "/api/me" || path === "/api/library" || path.startsWith("/api/library/") || path.startsWith("/api/manuscripts/")) {
       const options = { method: request.method, headers: request.headers };
       if (request.method === "POST") Object.assign(options, { body: Readable.toWeb(request), duplex: "half" });
-      const result = await worker.fetch(new Request(url, options), { DB });
+      const result = await worker.fetch(new Request(url, options), { DB, DEV_USER: "local-development-user" });
       response.writeHead(result.status, Object.fromEntries(result.headers));
       response.end(Buffer.from(await result.arrayBuffer()));
       return;

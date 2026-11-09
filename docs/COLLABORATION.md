@@ -38,10 +38,10 @@ native UI backend.
 ## Hosted rooms
 
 Share → Start live editing saves a native checkpoint and opens a room.
-Copy the live link to another window with access to the private workspace.
-A link also works through Open a link on the homepage. A copy link opens
-an independent local draft. The original local draft is still available
-from the manuscript library.
+Anyone with the room invitation link can edit that shared manuscript. Opening
+the link adds the room to that signed-in user's library across devices. A copy
+link opens an independent draft in the recipient's account. Private manuscripts
+are stored per account and are not discoverable from another user's library.
 
 The browser observes native body modifications and rebases unconfirmed
 edits over intervening native patches. D1 accepts an append only at the

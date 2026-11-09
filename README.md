@@ -16,9 +16,9 @@ Run `npm start` with Node.js 22 or later, then open
 - Click the title to rename a draft. The studio saves locally after edits,
   and **Save** commits on demand. The library lists and searches saved drafts.
   Each draft can be open for editing in one tab on the same browser origin.
-- **Export** downloads a PDF, LaTeX, or native TeXmacs copy. Manuscripts live
-  in IndexedDB on the current browser and origin. Keep exports for transfers
-  to other devices or browser profiles.
+- **Export** downloads a PDF, LaTeX, or native TeXmacs copy. Signed-in private
+  manuscripts sync to your account; IndexedDB keeps a local working copy.
+  Shared rooms appear in your account after you open their invitation link.
 - Append `?gpu=0` to use the upstream MuPDF rendering path. Otherwise the
   browser build selects its renderer.
 
@@ -27,14 +27,14 @@ additional manifest-listed fonts on demand. The static build includes the
 fonts bundled in `engine/fonts/`.
 
 For a draft created with the first Workbench prototype, export the draft as
-`.tex` from that version, then import the file in this edition. Browser
-documents are stored per origin, so use the same hostname and port when
-returning to a saved document.
+`.tex` from that version, then import the file in this edition. The first
+account sign-in moves existing local TeXmacs drafts into that account.
 
 ## Scope
 
-This package focuses on the native scientific editing workflow. Production browser
-collaboration remains open. The acceptance suite uses native patches,
+This package focuses on the native scientific editing workflow. Collaboration
+uses account-owned storage plus bearer invitation links and a durable room journal.
+The acceptance suite uses native patches,
 a file-backed journal fixture, and controlled delivery. The old slot model and its
 two-tab CRDT are no longer part of the editor. The port's optional
 computational plug-in bundles and desktop external programs are outside this
@@ -44,6 +44,10 @@ depends on the commands and packages used by a document.
 [Port notes](docs/PORT.md) trace input, trees, typesetting, export, and the
 native modification hook for collaboration. They also identify the exact
 upstream sources and build recipe.
+
+The public demo uses Tessera email/password accounts gated by a shared invite
+code. Account storage, demo limits, and setup are described in
+[Account storage](docs/ACCOUNT-STORAGE.md).
 
 ## Verify
 
