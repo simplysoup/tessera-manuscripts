@@ -285,13 +285,13 @@ function save(session, force = false) {
   if (session.saving) return session.saving;
   if (!session.editor || (!force && !session.retry && !session.editor.dirty())) return Promise.resolve();
   session.saving = (async () => {
-    status("Saving", "busy");
+    status(accountState.current()?.localOnly ? "Saving locally" : "Saving", "busy");
     const bytes = session.editor.capture();
     const next = { ...session.draft, format: "tm", bytes, updated: Date.now() };
     await documents.put(next);
     session.draft = next;
     session.retry = false;
-    if (state === session) status(session.editor.dirty() ? "Unsaved changes" : "Saved");
+    if (state === session) status(session.editor.dirty() ? "Unsaved changes" : accountState.current()?.localOnly ? "Saved locally" : "Saved");
   })().catch(error => {
     session.retry = true;
     if (state === session) status("Save failed", "error");
