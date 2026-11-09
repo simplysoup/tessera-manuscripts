@@ -1,7 +1,8 @@
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
 const sizeLimit = 512 * 1024;
 const sessionLifetime = 30 * 24 * 60 * 60 * 1000;
-const passwordIterations = 210000;
+// Cloudflare Workers caps Web Crypto PBKDF2 at 100,000 iterations.
+const passwordIterations = 100000;
 
 function json(value, status = 200, headers = {}) {
   return Response.json(value, { status, headers: { "Cache-Control": "no-store", ...headers } });

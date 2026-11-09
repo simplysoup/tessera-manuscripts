@@ -12,7 +12,10 @@ demo small, registration requires the shared `DEMO_INVITE_CODE` runtime secret,
 and registration stops after 25 accounts. Set this value in the Site runtime
 environment before deployment and share it only with demo participants.
 
-Passwords are stored as PBKDF2-SHA-256 hashes with per-account random salts.
+Passwords are stored as PBKDF2-SHA-256 hashes with per-account random salts
+using the Workers runtime's 100,000-iteration limit. For this small demo,
+registration also requires a 12-character password and login attempts are
+rate-limited; this setup is not a substitute for a production identity service.
 Successful sign-in creates a random, HttpOnly, Secure (on HTTPS), SameSite=Lax
 session cookie; only its SHA-256 hash is stored. Authentication attempts are
 limited by source IP. Email is used as the account name but is not verified, and
