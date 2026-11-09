@@ -38,6 +38,7 @@ button svg,summary svg,.search svg,.brand svg,.template svg,.draft-icon svg{widt
 .top-section,.save-status{color:var(--muted);font-size:13px}
 .top-actions{margin-left:auto;display:flex;align-items:center;gap:12px}
 .local-pill,.count{display:inline-flex;align-items:center;gap:7px;background:#eef2e9;border:1px solid #dfe6d9;border-radius:99px;padding:5px 9px;color:#405b4f;font-size:12px}
+.local-pill{flex:none;white-space:nowrap}
 .account-button{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:1px solid var(--line);border-radius:99px;background:var(--white);padding:6px 10px;color:var(--ink);font:inherit;font-size:12px;cursor:pointer}
 .tutorial-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .tutorial-card{min-height:130px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:17px;border:1px solid var(--line);border-radius:12px;background:var(--white);color:var(--ink);transition:transform .16s,border-color .16s,box-shadow .16s}
@@ -45,7 +46,7 @@ button svg,summary svg,.search svg,.brand svg,.template svg,.draft-icon svg{widt
 .tutorial-card strong{font-family:var(--serif);font-size:19px;font-weight:600;letter-spacing:-.02em}
 .tutorial-card>span:last-child{font-size:12px;line-height:1.5;color:var(--muted)}
 .tutorial-number{font:10px var(--mono);letter-spacing:.1em;color:#658575}
-.local-pill>span,.small-dot,.save-status>span:first-child{width:7px;height:7px;border-radius:50%;background:#5a8a70;display:inline-block;flex:none}
+.local-pill>span:first-child,.small-dot,.save-status>span:first-child{width:7px;height:7px;border-radius:50%;background:#5a8a70;display:inline-block;flex:none}
 .icon-button{border:1px solid var(--line);background:transparent;border-radius:9px;color:var(--ink);width:35px;height:35px;display:grid;place-items:center}
 .icon-button:hover,.button.outline:hover{background:#e9eee4}
 .main{max-width:1200px;margin:auto;padding:30px 34px 0}
