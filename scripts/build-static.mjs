@@ -19,6 +19,7 @@ await cp(join(root, "docs/PORT.md"), join(dist, "legal/PORT.md"));
 await cp(join(root, "docs/ENGINE-SHA256.txt"), join(dist, "legal/ENGINE-SHA256.txt"));
 await cp(join(root, "docs/COLLABORATION.md"), join(dist, "legal/COLLABORATION.md"));
 await cp(join(root, "docs/upstream-licenses"), join(dist, "legal/upstream-licenses"), { recursive: true });
+await cp(join(root, "upsilon"), join(dist, "legal/upsilon"), { recursive: true });
 await cp(join(engine, "texmacs.html"), join(dist, "legal/texmacs.html.txt"));
 for (const entry of await readdir(engine, { withFileTypes: true })) {
   if (entry.isFile()) await cp(join(engine, entry.name), join(dist, entry.name));

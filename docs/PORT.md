@@ -2,32 +2,19 @@
 
 ## Provenance
 
-The included engine files are the prebuilt browser distribution from
-[TeXmacs Upsilon](https://mgubi.github.io/texmacs/). The build identity
-embedded in `doc/about/welcome/texmacs-vue-build.en.tm` names
-[2c6c572a4f98dd8f14967a2f05f035297db9792f](https://github.com/mgubi/texmacs/tree/2c6c572a4f98dd8f14967a2f05f035297db9792f)
-from the `wasm_ci` branch, Emscripten 6.0.10, S7 11.9, SDL 3.4.2, and
-MuPDF 1.28.5. The included JS and WASM are unmodified. The package
-[asset hashes](ENGINE-SHA256.txt) cover the exact files served at release.
-Upstream's license notices are in [upstream-licenses](upstream-licenses).
+The shipped browser engine is built from
+[TeXmacs Upsilon f531d91](https://github.com/mgubi/texmacs/tree/f531d91ea039b67fc405c9eb771b9e54cdfad9b7)
+with Tessera's three patches applied in order. It uses Emscripten 6.0.10
+and MuPDF 1.28.5. The [engine asset hashes](ENGINE-SHA256.txt) identify
+the bundled files. Upstream license notices are in
+[upstream-licenses](upstream-licenses).
 
-The build recipe is
-[.github/workflows/wasm.yml](https://github.com/mgubi/texmacs/blob/2c6c572a4f98dd8f14967a2f05f035297db9792f/.github/workflows/wasm.yml).
-For a source build, check out the commit, activate Emscripten 6.0.10,
-then run these commands from the upstream repository's `src/` directory:
-
-```sh
-mkdir -p build-wasm
-sh misc/wasm/build-mupdf.sh 1.28.5
-sh misc/thorvg/build-thorvg.sh build-wasm/thorvg wasm
-make -C build-wasm -f ../misc/wasm/Makefile -j4 web node
-```
-
-The build requires the tools and dependencies in that workflow, including
-Node and the browser port's source and asset inputs. The upstream web
-output is `build-wasm/out/web`. This Workbench release packages the prebuilt
-output and tests that binary. The source rebuild recipe has not been run as
-part of this release.
+Use the pinned [upstream toolchain workflow](https://github.com/mgubi/texmacs/blob/f531d91ea039b67fc405c9eb771b9e54cdfad9b7/.github/workflows/wasm.yml)
+and the [embedded build instructions](upsilon/README.md).
+Apply the [native theme](upsilon/0001-theme-native-vue-widgets.patch),
+[embedded profile](upsilon/0002-embedded-editor-build.patch), and
+[caret and fraction targets](upsilon/0003-embedded-caret-and-fraction-targets.patch)
+patches in order.
 
 ## Source map
 

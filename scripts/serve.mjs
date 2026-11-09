@@ -20,13 +20,14 @@ const engineFiles = new Set([
   ...[16, 32, 64, 128, 192, 256, 512].map(size => "texmacs-vue-" + size + ".png"),
   ...packGzip.values(),
 ]);
-const appFiles = new Set(["index.html", "style.css", "workspace.js", "documents.js", "engine.js", "native-room.js", "live.js", "sharing.js", "mark.svg"]);
+const appFiles = new Set(["index.html", "style.css", "workspace.js", "documents.js", "engine.js", "shortcuts.js", "native-room.js", "live.js", "sharing.js", "mark.svg"]);
 const examples = new Set(["nested-derivation.tm", "nested-import.tex"]);
 const upstream = "https://mgubi.github.io/texmacs/";
 const types = {
   ".css": "text/css; charset=utf-8",
   ".md": "text/plain; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
+  ".patch": "text/plain; charset=utf-8",
   ".svg": "image/svg+xml",
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -91,6 +92,11 @@ async function load(path) {
   }
   if (path === "/examples/" + file && examples.has(file)) return readFile(join(root, "web/examples", file));
   if (path === "/legal/" || path === "/legal/index.html") return readFile(join(root, "web/legal/index.html"));
+  if (path === "/legal/upsilon/" + file && /^(?:README\.md|000[1-3]-[a-z-]+\.patch)$/u.test(file)) {
+    return readFile(join(root, "upsilon", file)).catch(error => {
+      if (error.code !== "ENOENT") throw error;
+    });
+  }
   if (path === "/legal/texmacs.html.txt") return readFile(join(engine, "texmacs.html"));
   if (path === "/legal/" + file && ["PORT.md", "ENGINE-SHA256.txt", "COLLABORATION.md"].includes(file)) {
     return readFile(join(root, "docs", file));

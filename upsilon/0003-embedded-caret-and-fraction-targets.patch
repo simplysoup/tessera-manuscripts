@@ -57,7 +57,7 @@
 
    // These are tm-defined in graphics-utils.scm (looks like they shouldn't)
  #define ShiftMask     256
-@@ -152,8 +153,58 @@
+@@ -152,8 +153,59 @@
  }
 
  void
@@ -72,6 +72,7 @@
 +        (is_func (t, FRAC) || is_compound (t, "tfrac") ||
 +         is_compound (t, "dfrac") || is_compound (t, "frac*") ||
 +         is_compound (t, "cfrac"))) {
++      if (t[0] != "" && t[1] != "") return;
 +      cursor num= eb->find_check_cursor (start (et, p * 0));
 +      cursor den= eb->find_check_cursor (start (et, p * 1));
 +      if (!num->valid || !den->valid) return;
