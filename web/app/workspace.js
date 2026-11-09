@@ -1,6 +1,7 @@
 import { documents, claim } from "./documents.js";
 import { mountEditor, warmAssets } from "./engine.js";
-import { createCopyLink, readCopyLink } from "./sharing.js";
+import { readCopyLink } from "./sharing.js";
+import { connectRoom, createLink, linkUrl, readLink } from "./live.js";
 
 const $ = id => document.getElementById(id);
 const utf8 = new TextEncoder();
@@ -39,7 +40,7 @@ function notice(message) {
 }
 
 function status(message, kind = "") {
-  $("save-status").lastElementChild.textContent = message;
+  if ($("save-status").lastElementChild.textContent !== message) $("save-status").lastElementChild.textContent = message;
   $("save-status").dataset.state = kind;
 }
 
@@ -90,7 +91,7 @@ function showDrafts() {
     name.textContent = draft.title;
     const meta = document.createElement("span");
     meta.className = "draft-meta";
-    meta.textContent = "Edited " + new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(draft.updated);
+    meta.textContent = draft.room ? "Live manuscript" : "Edited " + new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(draft.updated);
     text.append(name, meta);
     open.append(mark, text);
     open.addEventListener("click", () => openDraft(draft.id));
@@ -123,13 +124,15 @@ async function refresh() {
   showDrafts();
 }
 
-function ask({ label, title, copy, confirm = "Done", name, action }) {
+function ask({ label, title, copy, confirm = "Done", name, field = "Manuscript name", maxLength = 90, action }) {
   $("dialog-label").textContent = label;
   $("dialog-title").textContent = title;
   $("dialog-copy").textContent = copy;
   $("dialog-confirm").textContent = confirm;
   $("name-field").hidden = name === undefined;
   $("name").value = name ?? "";
+  $("name-label").textContent = field;
+  $("name").maxLength = maxLength;
   $("name").required = name !== undefined;
   dialogAction = action;
   $("dialog").returnValue = "";
@@ -146,30 +149,41 @@ $("dialog").addEventListener("close", async () => {
 });
 
 function enable(ready) {
-  for (const id of ["rename", "save", "source-mode", "tools", "share"]) $(id).disabled = !ready;
-  for (const id of ["exports", "inserts"]) {
+  for (const id of ["rename", "save", "source-mode", "share"]) $(id).disabled = !ready;
+  $("rename").disabled ||= Boolean(state?.draft?.room);
+  for (const id of ["exports", "inserts", "tools"]) {
     $(id).firstElementChild.setAttribute("aria-disabled", String(!ready));
     for (const button of $(id).querySelectorAll("button")) button.disabled = !ready;
     if (!ready) $(id).open = false;
   }
 }
 
-function studioUrl(id) {
+function studioUrl(id, room) {
   const url = new URL(location.href);
-  if (id) url.searchParams.set("draft", id);
-  else url.searchParams.delete("draft");
+  for (const key of ["draft", "room", "copy", "open"]) url.searchParams.delete(key);
+  url.hash = "";
+  if (id) url.searchParams.set(room ? "room" : "draft", id);
   history.replaceState(null, "", url);
 }
 
-async function openDraft(id) {
+async function openDraft(id, shared) {
   if (state) return;
   const session = { controller: new AbortController(), busy: false };
   state = session;
   try {
-    session.release = await claim(id);
-    if (!session.release) throw new Error("This draft is already open in another tab.");
-    const draft = await documents.get(id);
-    if (!draft) throw new Error("This manuscript is unavailable in this browser.");
+    const local = await documents.get(id);
+    const room = shared || local?.room;
+    if (!room) {
+      session.release = await claim(id);
+      if (!session.release) throw new Error("This draft is already open in another tab.");
+      if (!local) throw new Error("This manuscript is unavailable in this browser.");
+    }
+    const draft = room ? {
+      ...await readLink("room", id, session.controller.signal), id, room: true, updated: Date.now(),
+    } : local;
+    if (room && !local) {
+      await documents.put({ id, room: true, title: draft.title, updated: draft.updated });
+    }
     session.draft = draft;
     $("title").textContent = draft.title;
     $("studio").hidden = false;
@@ -183,12 +197,22 @@ async function openDraft(id) {
     $("cover-title").textContent = "Opening your manuscript";
     $("cover-copy").textContent = "Getting the writing room ready. You can go back while it loads.";
     $("source-mode").setAttribute("aria-pressed", "false");
-    $("tools").setAttribute("aria-pressed", "false");
-    studioUrl(id);
+    $("native-tools").setAttribute("aria-pressed", "false");
+    $("draft-kind").textContent = room ? "Live manuscript" : "Local draft";
+    studioUrl(id, room);
     status("Opening editor", "busy");
     enable(false);
     session.editor = await mountEditor($("editor-host"), draft, session.controller.signal);
     if (state !== session) return;
+    if (room) {
+      session.room = connectRoom(id, session.editor, (message, kind, error) => {
+        if (state !== session) return;
+        status(message, kind);
+        if (message === "Sync paused") $("editor-hint").textContent = error.message + " Your local edits are still here. Use Export to keep a copy.";
+      }, session.controller.signal);
+      await session.room.start();
+      if (state !== session) return;
+    }
     syncView(session.editor);
     $("editor-host").dataset.ready = "true";
     $("editor-host").inert = false;
@@ -196,7 +220,7 @@ async function openDraft(id) {
     $("editor-hint").textContent = "Click the page to write. Use Source to see the document tree.";
     enable(true);
     if (draft.format === "tex") await save(session, true);
-    else status("Saved here");
+    else if (!room) status("Saved here");
   } catch (error) {
     if (state !== session) return;
     if ($("studio").hidden) {
@@ -234,6 +258,7 @@ async function createDraft(template) {
 }
 
 function save(session, force = false) {
+  if (session.room) return session.room.flush();
   if (session.saving) return session.saving;
   if (!session.editor || (!force && !session.retry && !session.editor.dirty())) return Promise.resolve();
   session.saving = (async () => {
@@ -255,6 +280,7 @@ function save(session, force = false) {
 function returnToLibrary(session) {
   if (state !== session) return;
   session.controller.abort();
+  try { session.room?.stop(); } catch { /* The editor may have been closed in the native menus. */ }
   session.release?.();
   state = undefined;
   $("editor-host").dataset.ready = "false";
@@ -268,7 +294,7 @@ function returnToLibrary(session) {
 async function leave() {
   const session = state;
   if (!session || session.leaving) return;
-  if (!session.editor) {
+  if (!session.editor || $("editor-host").inert) {
     returnToLibrary(session);
     return;
   }
@@ -280,7 +306,7 @@ async function leave() {
     returnToLibrary(session);
   } catch {
     ask({
-      label: "LOCAL MANUSCRIPT", title: "The latest changes couldn’t be saved",
+      label: session.room ? "LIVE MANUSCRIPT" : "LOCAL MANUSCRIPT", title: "The latest changes couldn’t be saved",
       copy: "Cancel to keep editing or export a recovery copy. Returning now opens the library with the last saved version.",
       confirm: "Return with last saved",
       action: () => returnToLibrary(session),
@@ -320,7 +346,7 @@ $("file").addEventListener("change", async event => {
 
 $("about").addEventListener("click", () => ask({
   label: "A QUICK TOUR", title: "Your writing room",
-  copy: "Try Math playground to explore the editor. Click the page to edit, use Source to see its structure, and export a copy when you want to take it with you. Drafts live in this browser.",
+  copy: "Try Math playground to explore the editor. Click the page to edit and use Source to see its structure. Share lets you start a live room or send a copy.",
 }));
 $("back").addEventListener("click", leave);
 $("save").addEventListener("click", async () => {
@@ -357,23 +383,24 @@ $("source-mode").addEventListener("click", () => {
   try { state.editor.toggleSource(); syncView(state.editor); }
   catch (error) { notice(error.message); }
 });
-$("tools").addEventListener("click", () => {
-  const next = $("tools").getAttribute("aria-pressed") !== "true";
+$("native-tools").addEventListener("click", () => {
+  const next = $("native-tools").getAttribute("aria-pressed") !== "true";
   try {
     state.editor.setTools(next);
-    $("tools").setAttribute("aria-pressed", String(next));
+    $("native-tools").setAttribute("aria-pressed", String(next));
+    $("tools").open = false;
   } catch (error) { notice(error.message); }
 });
-for (const id of ["exports", "inserts"]) {
+for (const id of ["exports", "inserts", "tools"]) {
   $(id).firstElementChild.addEventListener("click", event => {
     if (!state?.editor) event.preventDefault();
   });
   $(id).addEventListener("toggle", () => {
-    if ($(id).open) $(id === "exports" ? "inserts" : "exports").open = false;
+    if ($(id).open) for (const other of ["exports", "inserts", "tools"]) if (other !== id) $(other).open = false;
   });
 }
-$("inserts").querySelectorAll("[data-insert]").forEach(button => button.addEventListener("click", () => {
-  $("inserts").open = false;
+document.querySelectorAll("[data-insert]").forEach(button => button.addEventListener("click", () => {
+  button.closest("details").open = false;
   try { state.editor.insert(button.dataset.insert); }
   catch (error) { notice(error.message); }
 }));
@@ -394,56 +421,129 @@ $("exports").querySelectorAll("[data-format]").forEach(button => button.addEvent
   try { download(state, button.dataset.format); } catch (error) { notice(error.message); }
 }));
 
-let shareRequest = 0;
-$("share").addEventListener("click", async () => {
+function showShare(session) {
+  $("start-room").hidden = Boolean(session.room);
+  $("start-room").disabled = false;
+  $("room-link-row").hidden = !session.room;
+  $("room-link").value = session.room ? linkUrl("room", session.draft.id) : "";
+  $("room-help").textContent = session.room
+    ? "Open this link in another window to edit the same manuscript."
+    : "Start a shared room from this draft, then invite another editor.";
+  $("start-copy").hidden = false;
+  $("start-copy").disabled = false;
+  $("copy-link-row").hidden = true;
+  $("copy-link").value = "";
+  $("copy-help").textContent = "Create a snapshot that opens as a separate draft, or download the native file.";
+  if (!$("share-dialog").open) $("share-dialog").showModal();
+}
+
+$("share").addEventListener("click", () => {
+  if (state?.editor) showShare(state);
+});
+$("start-room").addEventListener("click", async () => {
+  const session = state;
+  if (!session?.editor || session.room) return;
+  $("start-room").disabled = true;
+  $("room-help").textContent = "Creating your shared room…";
+  try {
+    await save(session);
+    const id = await createLink("room", session.draft.title, session.editor.exportFile("texmacs"));
+    if (state !== session) return;
+    const showLink = $("share-dialog").open;
+    $("share-dialog").close();
+    await leave();
+    if (state === session) throw new Error("Save this draft before opening the live room.");
+    await openDraft(id, true);
+    if (showLink && state?.room && !$("editor-host").inert) showShare(state);
+  } catch (error) {
+    $("room-help").textContent = error.message;
+    if (!$("share-dialog").open) notice(error.message);
+  } finally {
+    $("start-room").disabled = false;
+  }
+});
+$("start-copy").addEventListener("click", async () => {
   const session = state;
   if (!session?.editor) return;
-  const request = ++shareRequest;
-  $("copy-link").value = "";
-  $("copy-link").placeholder = "Preparing link…";
-  $("copy-help").textContent = "The link contains your manuscript. Send it only to people you trust who can sign in to this private workspace.";
-  $("copy-link-button").disabled = true;
-  $("share-dialog").showModal();
+  $("start-copy").disabled = true;
+  $("copy-help").textContent = "Creating your copy…";
   try {
-    const link = await createCopyLink(location.href, session.draft.title, session.editor.exportFile("texmacs"));
-    if (state !== session || request !== shareRequest || !$("share-dialog").open) return;
-    $("copy-link").value = link;
-    $("copy-link-button").disabled = false;
+    const id = await createLink("copy", session.draft.title, session.editor.exportFile("texmacs"));
+    if (state !== session || !$("share-dialog").open) return;
+    $("copy-link").value = linkUrl("copy", id);
+    $("copy-link-row").hidden = false;
+    $("start-copy").hidden = true;
+    $("copy-help").textContent = "Anyone with this link and workspace access can open a separate editable draft.";
   } catch (error) {
-    if (request !== shareRequest) return;
-    $("copy-link").placeholder = "Link unavailable";
     $("copy-help").textContent = error.message;
+  } finally {
+    $("start-copy").disabled = false;
   }
 });
-$("copy-link-button").addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText($("copy-link").value);
-    notice("Editable copy link copied.");
-  } catch {
-    $("copy-link").focus();
-    $("copy-link").select();
-    $("copy-help").textContent = "Use your keyboard’s copy shortcut to copy the selected link.";
-  }
-});
+for (const kind of ["copy", "room"]) {
+  $(kind + "-link-button").addEventListener("click", async () => {
+    const field = $(kind + "-link");
+    try {
+      await navigator.clipboard.writeText(field.value);
+      $(kind + "-help").textContent = "Link copied.";
+    } catch {
+      field.focus();
+      field.select();
+      $(kind + "-help").textContent = "Use your keyboard’s copy shortcut to copy the selected link.";
+    }
+  });
+}
 $("share-download").addEventListener("click", () => {
   try { download(state, "texmacs"); } catch (error) { notice(error.message); }
 });
+
+const linkId = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
+
+async function openLink(url) {
+  if (url.origin !== location.origin) throw new Error("Enter a link from this Tessera workspace.");
+  const room = url.searchParams.get("room");
+  const copy = url.searchParams.get("copy");
+  if (room && linkId.test(room)) {
+    await openDraft(room, true);
+    return;
+  }
+  let manuscript;
+  if (copy && linkId.test(copy)) manuscript = await readLink("copy", copy);
+  else if (url.hash.startsWith("#copy=")) manuscript = await readCopyLink(url.hash);
+  else throw new Error("Paste the complete manuscript link using Open a link.");
+  ask({
+    label: "EDITABLE MANUSCRIPT COPY", title: "Open “" + manuscript.title + "”?",
+    copy: "Tessera will make a separate local draft. Open copies from people you trust.",
+    confirm: "Open editable copy", action: () => createDraft(manuscript),
+  });
+}
+
+$("open-link").addEventListener("click", () => ask({
+  label: "MANUSCRIPT LINKS", title: "Open a manuscript link",
+  copy: "Paste a Tessera live room or editable copy link.",
+  confirm: "Open link", name: "", field: "Manuscript link", maxLength: 12500,
+  action: async value => {
+    let url;
+    try { url = new URL(value); } catch { throw new Error("Enter the complete Tessera link."); }
+    await openLink(url);
+  },
+}));
 
 setInterval(() => {
   if (!state?.editor || state.busy || state.saving || state.leaving) return;
   try {
     if (state.editor.active()) syncView(state.editor);
-    else if ($("tools").getAttribute("aria-pressed") !== "true") {
+    else if ($("native-tools").getAttribute("aria-pressed") !== "true") {
       state.editor.setTools(true);
-      $("tools").setAttribute("aria-pressed", "true");
+      $("native-tools").setAttribute("aria-pressed", "true");
     }
-    save(state).catch(() => {});
+    if (!state.room) save(state).catch(() => {});
   } catch { status("Editor unavailable", "error"); }
 }, 2500);
 
 addEventListener("beforeunload", event => {
   let pending = state?.saving || state?.retry || state?.renaming;
-  try { pending ||= state?.editor?.dirty(); } catch { pending = true; }
+  try { pending ||= state?.room ? state.room.pending() : state?.editor?.dirty(); } catch { pending = true; }
   if (pending) {
     event.preventDefault();
     event.returnValue = "";
@@ -455,20 +555,10 @@ addEventListener("focus", () => {
 
 try {
   await refresh();
-  if (initialUrl.hash.startsWith("#copy=")) {
-    const clean = new URL(location.href);
-    clean.hash = "";
-    clean.searchParams.delete("draft");
-    clean.searchParams.delete("open");
-    history.replaceState(null, "", clean);
-    try {
-      const copy = await readCopyLink(initialUrl.hash);
-      ask({
-        label: "EDITABLE MANUSCRIPT COPY", title: "Open “" + copy.title + "”?",
-        copy: "Tessera will make a new local draft. Open copies from people you trust.",
-        confirm: "Open editable copy", action: () => createDraft(copy),
-      });
-    } catch (error) { notice(error.message); }
+  if (initialUrl.searchParams.has("room") || initialUrl.searchParams.has("copy") ||
+      initialUrl.searchParams.get("open") === "copy" || initialUrl.hash.startsWith("#copy=")) {
+    try { await openLink(initialUrl); }
+    catch (error) { notice(error.message); }
   } else {
     const requested = initialUrl.searchParams.get("draft");
     if (requested) await openDraft(requested);

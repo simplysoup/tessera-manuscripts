@@ -1,3 +1,5 @@
+import { roomScheme } from "./native-room.js";
+
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 async function until(check, signal, failure, timeout = 45000) {
@@ -14,6 +16,11 @@ const inserts = {
   equation: "(make 'equation*)",
   section: "(make-section 'section)",
   theorem: "(make 'theorem)",
+  fraction: "(make-fraction)",
+  bold: "(make-with \"font-series\" \"bold\")",
+  italic: "(make-with \"font-shape\" \"italic\")",
+  undo: "(undo 0)",
+  redo: "(redo 0)",
 };
 const suffixes = { texmacs: "tm", latex: "tex", pdf: "pdf" };
 
@@ -107,7 +114,7 @@ export async function mountEditor(host, draft, signal) {
     runtime.dispatchEvent(new runtime.Event("resize"));
   }
   function requireManuscript() {
-    if (current() !== path) throw new Error("Select your manuscript in Tools first.");
+    if (current() !== path) throw new Error("Use Tools → Native TeXmacs menus to select your manuscript.");
   }
   function rename(title) {
     call(`(buffer-set-title ${url} ${JSON.stringify(title)})`);
@@ -117,6 +124,21 @@ export async function mountEditor(host, draft, signal) {
 
   return {
     setTools,
+    room() {
+      call(roomScheme);
+      call(`(tessera-start ${url})`);
+      return {
+        take() {
+          const value = call("(tessera-take)");
+          return value === "#f" ? null : value;
+        },
+        pending: () => call("(null? tessera-pending)") === "#f",
+        accept: patch => call(`(tessera-accept ${JSON.stringify(patch)})`),
+        restore: patch => call(`(tessera-restore ${JSON.stringify(patch)})`),
+        receive: patch => call(`(tessera-receive ${JSON.stringify(patch)})`) === "#t",
+        stop: () => call("(tessera-stop)"),
+      };
+    },
     rename,
     insert(kind) {
       requireManuscript();

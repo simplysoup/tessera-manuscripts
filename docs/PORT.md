@@ -62,11 +62,7 @@ body observers, native patch application and separate style/environment
 metadata is relevant to a browser bridge. Browser storage's single-writer
 coordination is a separate concern.
 
-The observer test is a local round-trip test. A Tree-CRDT binding must
-translate positional native modifications against stable replicated
-identities, including split/join and wrapper operations. Remote changes
-need to apply in place, preserve local cursors, suppress echo and integrate
-with native undo authorship. Before enabling live collaboration, tests
-need to cover simultaneous edits to independent matrix cells, competing
-structural edits, style changes and reconnect. The port currently exposes
-no collaborative room mode.
+The deployed room adapter uses native positional patches and browser-side
+rebasing. A site endpoint journals accepted revisions, and each browser
+applies them in place. See [Collaboration](COLLABORATION.md) for the
+current behavior and test boundaries.

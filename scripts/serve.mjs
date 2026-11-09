@@ -1,9 +1,13 @@
 import { createHash } from "node:crypto";
 import { createServer } from "node:http";
+import { Readable } from "node:stream";
+import { DatabaseSync } from "node:sqlite";
+import worker from "../worker/index.js";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
+import { parseArgs } from "node:util";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const engine = join(root, "engine");
@@ -16,7 +20,7 @@ const engineFiles = new Set([
   ...[16, 32, 64, 128, 192, 256, 512].map(size => "texmacs-vue-" + size + ".png"),
   ...packGzip.values(),
 ]);
-const appFiles = new Set(["index.html", "style.css", "workspace.js", "documents.js", "engine.js", "sharing.js", "mark.svg"]);
+const appFiles = new Set(["index.html", "style.css", "workspace.js", "documents.js", "engine.js", "native-room.js", "live.js", "sharing.js", "mark.svg"]);
 const examples = new Set(["nested-derivation.tm", "nested-import.tex"]);
 const upstream = "https://mgubi.github.io/texmacs/";
 const types = {
@@ -33,6 +37,19 @@ const types = {
   ".tex": "text/plain; charset=utf-8",
 };
 const downloads = new Map();
+
+const sqlite = new DatabaseSync(":memory:");
+sqlite.exec(await readFile(join(root, "drizzle/0000_manuscript_links.sql"), "utf8"));
+const DB = {
+  prepare(sql) {
+    const statement = sqlite.prepare(sql);
+    return { bind: (...parameters) => ({
+      run: async () => statement.run(...parameters),
+      first: async () => statement.get(...parameters),
+      all: async () => ({ results: statement.all(...parameters) }),
+    }) };
+  },
+};
 
 function verifyFont(file, bytes) {
   const digest = /^tm-font-([a-f0-9]{12})\./u.exec(file)?.[1];
@@ -103,14 +120,22 @@ function respond(request, response, path, bytes) {
 }
 
 const server = createServer(async (request, response) => {
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    response.writeHead(405, { Allow: "GET, HEAD" }).end();
-    return;
-  }
   try {
-    const url = new URL(request.url, "http://localhost");
+    const url = new URL(request.url, "http://" + request.headers.host);
     const path = decodeURIComponent(url.pathname);
-    if (path === "/" && ["open", "file", "x"].some(key => url.searchParams.has(key))) {
+    if (path.startsWith("/api/manuscripts/")) {
+      const options = { method: request.method, headers: request.headers };
+      if (request.method === "POST") Object.assign(options, { body: Readable.toWeb(request), duplex: "half" });
+      const result = await worker.fetch(new Request(url, options), { DB });
+      response.writeHead(result.status, Object.fromEntries(result.headers));
+      response.end(Buffer.from(await result.arrayBuffer()));
+      return;
+    }
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      response.writeHead(405, { Allow: "GET, HEAD" }).end();
+      return;
+    }
+    if (path === "/" && url.searchParams.get("open") !== "copy" && ["open", "file", "x"].some(key => url.searchParams.has(key))) {
       response.writeHead(302, { Location: "/texmacs.html" + url.search }).end();
       return;
     }
@@ -123,6 +148,10 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(Number(process.env.PORT ?? 4173), "127.0.0.1", () => {
+const { values } = parseArgs({ options: {
+  host: { type: "string", default: "127.0.0.1" },
+  port: { type: "string", default: process.env.PORT ?? "4173" },
+}, strict: false });
+server.listen(Number(values.port), values.host, () => {
   console.log("Open http://127.0.0.1:" + server.address().port);
 });

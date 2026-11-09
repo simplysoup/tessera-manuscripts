@@ -41,7 +41,7 @@
           <div class="eyebrow hero-label"><span></span> THE WRITING ROOM</div>
           <h1 id="hero-title">Space for<br>good ideas<span>.</span></h1>
           <p>Write papers, play with equations, and make your thinking visible.</p>
-          <div class="hero-actions"><button class="button bright" id="new"><svg><use href="#plus"/></svg> New manuscript</button><button class="button ghost" id="import"><svg><use href="#upload"/></svg> Import a file</button></div>
+          <div class="hero-actions"><button class="button bright" id="new"><svg><use href="#plus"/></svg> New manuscript</button><button class="button ghost" id="import"><svg><use href="#upload"/></svg> Import a file</button><button class="button ghost" id="open-link">Open a link</button></div>
         </div>
         <svg class="hero-art" viewBox="0 0 480 320" aria-hidden="true">
           <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0v24" fill="none" stroke="#bde4d5" stroke-opacity=".12"/></pattern><linearGradient id="art-fill"><stop stop-color="#2f6d5c"/><stop offset="1" stop-color="#204f49"/></linearGradient></defs>
@@ -77,7 +77,17 @@
       <div class="editor-actions">
         <span id="save-status" class="save-status" role="status"><span></span><span>Opening editor</span></span>
         <details id="inserts" class="exports"><summary class="button outline" aria-disabled="true"><svg><use href="#plus"/></svg> Insert <svg><use href="#down"/></svg></summary><div class="export-menu"><button data-insert="equation">Equation <span>ƒ(x)</span></button><button data-insert="section">Section <span>§</span></button><button data-insert="theorem">Theorem <span>∴</span></button></div></details>
-        <button id="tools" class="button outline" type="button" aria-pressed="false" disabled>Tools</button>
+        <details id="tools" class="exports tools-menu">
+          <summary class="button outline" aria-disabled="true">Tools <svg><use href="#down"/></svg></summary>
+          <div class="export-menu">
+            <div class="eyebrow">EDITING</div>
+            <button data-insert="undo">Undo</button><button data-insert="redo">Redo</button>
+            <button data-insert="bold">Bold <span>B</span></button><button data-insert="italic">Italic <span><i>I</i></span></button>
+            <button data-insert="fraction">Fraction <span>½</span></button>
+            <div class="tools-divider"></div>
+            <button id="native-tools" type="button" aria-pressed="false">Native TeXmacs menus</button>
+          </div>
+        </details>
         <button id="source-mode" class="button outline" type="button" aria-pressed="false" disabled><svg><use href="#code"/></svg><span>Source</span></button>
         <button id="save" class="button outline" type="button" disabled>Save</button>
         <details id="exports" class="exports"><summary class="button outline" aria-disabled="true">Export <svg><use href="#down"/></svg></summary><div class="export-menu"><button data-format="pdf">PDF <span>.pdf</span></button><button data-format="latex">LaTeX <span>.tex</span></button><button data-format="texmacs">TeXmacs <span>.tm</span></button></div></details>
@@ -95,21 +105,27 @@
         </div>
       </div>
     </main>
-    <footer class="editor-footer"><span><span class="small-dot"></span> Local draft</span><span id="editor-context"></span><span id="editor-hint">Your manuscript is stored in this browser.</span></footer>
+    <footer class="editor-footer"><span><span class="small-dot"></span> <span id="draft-kind">Local draft</span></span><span id="editor-context"></span><span id="editor-hint">Your manuscript is stored in this browser.</span></footer>
   </section>
   <input type="file" id="file" accept=".tex,.tm" hidden>
-  <dialog id="dialog"><form method="dialog" id="dialog-form"><div class="eyebrow" id="dialog-label"></div><h2 id="dialog-title"></h2><p id="dialog-copy"></p><label id="name-field" hidden>Manuscript name<input id="name" maxlength="90" autocomplete="off"></label><div class="dialog-actions"><button class="button outline" value="cancel" type="submit" formnovalidate>Cancel</button><button class="button dark" id="dialog-confirm" value="confirm" type="submit">Done</button></div></form></dialog>
+  <dialog id="dialog"><form method="dialog" id="dialog-form"><div class="eyebrow" id="dialog-label"></div><h2 id="dialog-title"></h2><p id="dialog-copy"></p><label id="name-field" hidden><span id="name-label">Manuscript name</span><input id="name" maxlength="90" autocomplete="off"></label><div class="dialog-actions"><button class="button outline" value="cancel" type="submit" formnovalidate>Cancel</button><button class="button dark" id="dialog-confirm" value="confirm" type="submit">Done</button></div></form></dialog>
   <dialog id="share-dialog" aria-labelledby="share-title">
     <form method="dialog">
-      <div class="eyebrow">MANUSCRIPT SHARING</div><h2 id="share-title">Share a copy</h2>
-      <p>A copy opens as a new, editable draft. Each person’s changes stay in their own copy.</p>
+      <div class="eyebrow">MANUSCRIPT SHARING</div><h2 id="share-title">Share manuscript</h2>
+      <p>Send links to people with access to this private workspace.</p>
       <div class="share-panel">
-        <label for="copy-link">Editable copy link</label>
-        <p id="copy-help">The link contains your manuscript. Send it only to people you trust who can sign in to this private workspace.</p>
-        <div class="copy-row"><input id="copy-link" type="text" readonly aria-describedby="copy-help" placeholder="Preparing link…"><button id="copy-link-button" type="button" class="button dark" disabled>Copy link</button></div>
-        <button id="share-download" type="button" class="button outline">Download .tm for anyone</button>
+        <label for="room-link">Edit together</label>
+        <p id="room-help">Start a shared room, then open its link in another window to edit the same manuscript.</p>
+        <button id="start-room" type="button" class="button dark">Start live editing</button>
+        <div class="copy-row" id="room-link-row" hidden><input id="room-link" type="text" readonly aria-describedby="room-help"><button id="room-link-button" type="button" class="button dark">Copy live link</button></div>
       </div>
-      <div class="share-live"><strong>Live collaboration</strong><span>Live invitations aren’t available yet.</span></div>
+      <div class="share-panel">
+        <label for="copy-link">Send an editable copy</label>
+        <p id="copy-help">Create a snapshot that opens as a separate draft, or download the native file.</p>
+        <button id="start-copy" type="button" class="button outline">Create copy link</button>
+        <div class="copy-row" id="copy-link-row" hidden><input id="copy-link" type="text" readonly aria-describedby="copy-help"><button id="copy-link-button" type="button" class="button outline">Copy link</button></div>
+        <button id="share-download" type="button" class="button outline">Download .tm</button>
+      </div>
       <div class="dialog-actions"><button class="button outline" value="close">Done</button></div>
     </form>
   </dialog>

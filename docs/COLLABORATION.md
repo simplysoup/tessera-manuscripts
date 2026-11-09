@@ -35,7 +35,35 @@ contract and require agreement on both sides. Browser chrome can be styled
 as HTML and CSS. Changes to canvas-drawn Upsilon widgets belong in its
 native UI backend.
 
-## Commit and recovery rules
+## Hosted rooms
+
+Share → Start live editing saves a native checkpoint and opens a room.
+Copy the live link to another window with access to the private workspace.
+A link also works through Open a link on the homepage. A copy link opens
+an independent local draft. The original local draft is still available
+from the manuscript library.
+
+The browser observes native body modifications and rebases unconfirmed
+edits over intervening native patches. D1 accepts an append only at the
+expected revision and recognizes a retry by operation ID. Each browser
+polls the journal and applies remote patches in place, with its own
+editor author reserved for local undo. Closing the initiating window
+does not stop the other window. Overlapping edits that cannot be rebased
+pause synchronization and leave the working version available for export.
+
+This first hosted room synchronizes the body tree. The initial checkpoint
+includes style and environment, but subsequent changes to those settings
+and external project assets are outside the patch stream. Accepted changes
+survive closing and reopening the room. Use Export to keep pending changes
+if synchronization pauses. Transport uses the site relay, without a
+WebRTC connection or a browser elected as the network host.
+
+`npm test` covers copy storage, revision races, idempotent appends,
+and bidirectional delivery and replay through the production JavaScript
+session port using a substitute editor adapter. The local development
+server runs the same HTTP routes against temporary SQLite storage.
+
+## Host lease and durable outbox design
 
 - A lease has one owner, an expiry, and a monotonically increasing
   generation. An append atomically checks the current lease, checks the
@@ -67,6 +95,4 @@ The first two peers use different native toolbar placements.
 The harness uses a deterministic delivery schedule, a controlled lease
 clock, browser local storage for its test outbox, and a single-process
 file-backed journal fixture. This verifies native patch and recovery
-behavior under those conditions. Production signaling, WebRTC and TURN,
-authentication, transactional storage across multiple processes, and UI
-integration need their own tests against the actual adapters.
+behavior under those conditions. WebRTC signaling, TURN, and host leases are outside the hosted relay. The harness is separate from the HTTP relay tests.
