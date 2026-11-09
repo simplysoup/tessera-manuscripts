@@ -222,7 +222,7 @@ async function openDraft(id, shared) {
     $("editor-host").dataset.ready = "true";
     $("editor-host").inert = false;
     $("editor-cover").hidden = true;
-    $("editor-hint").textContent = "Click the page to write. Use Document → Source to edit the source tree.";
+    $("editor-hint").textContent = "Tools follow the cursor. Choose View → Toolbars to control which rows are visible.";
     enable(true);
     if (draft.format === "tex") await save(session, true);
     else if (!room) status("Saved here");

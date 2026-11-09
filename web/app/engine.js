@@ -65,6 +65,14 @@ function boot(host) {
     engine().tmProgress.running(() => { started = true; });
     await until(() => started, signal, "The editor did not finish starting. Try opening the manuscript again.");
     const runtime = engine();
+    const view = runtime.TeXmacs.scheme(`(begin
+      (set-preference "header" "on")
+      (set-preference "main icon bar" "on")
+      (set-preference "mode dependent icons" "on")
+      (set-preference "focus dependent icons" "on")
+      (set-preference "user provided icons" "off")
+      (set-preference "status bar" "off"))`);
+    if (view.startsWith("(error ")) throw new Error("The editor could not configure its toolbars.");
     runtime.FS.mkdirTree("/tmp/tessera");
     return { runtime, iframe };
   })().catch(error => {
@@ -117,14 +125,7 @@ export async function mountEditor(host, draft, signal, { onShortcut, shortcutHin
     call(`(buffer-set-title ${url} ${JSON.stringify(title)})`);
   }
   rename(draft.title);
-  call(`(begin
-    (set-preference "header" "on")
-    (set-preference "main icon bar" "off")
-    (set-preference "mode dependent icons" "off")
-    (set-preference "focus dependent icons" "off")
-    (set-preference "user provided icons" "off")
-    (set-preference "status bar" "off")
-    (show-header #t))`);
+  call("(show-header #t)");
   installShortcuts(runtime, {
     command: onShortcut,
     replay: key => runtime.TeXmacs.later(`(key-press ${JSON.stringify(key)})`),

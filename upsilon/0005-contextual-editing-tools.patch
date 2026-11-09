@@ -1,0 +1,123 @@
+--- a/src/TeXmacs/progs/texmacs/menus/main-menu.scm
++++ b/src/TeXmacs/progs/texmacs/menus/main-menu.scm
+@@ -147,17 +147,19 @@
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+ (menu-bind texmacs-main-icons
+-  (if (window-per-buffer?)
+-      ((balloon (icon "tm_new.xpm") "Create a new document")
+-       (new-document)))
+-  (if (not (window-per-buffer?))
+-      (=> (balloon (icon "tm_new.xpm") "Create a new document")
+-          (link new-file-menu)))
+-  (=> (balloon (icon "tm_open.xpm") "Load a file") (link load-menu))
+-  (=> (balloon (icon "tm_save.xpm") "Save this buffer") (link save-menu))
++  (if (not (tessera-editor?))
++      (if (window-per-buffer?)
++          ((balloon (icon "tm_new.xpm") "Create a new document")
++           (new-document)))
++      (if (not (window-per-buffer?))
++          (=> (balloon (icon "tm_new.xpm") "Create a new document")
++              (link new-file-menu)))
++      (=> (balloon (icon "tm_open.xpm") "Load a file") (link load-menu))
++      (=> (balloon (icon "tm_save.xpm") "Save this buffer") (link save-menu)))
+   ((balloon (icon "tm_build.xpm") "Update this buffer")
+    (update-document "all"))
+-  (=> (balloon (icon "tm_print.xpm") "Print") (link print-menu-inline))
++  (if (not (tessera-editor?))
++      (=> (balloon (icon "tm_print.xpm") "Print") (link print-menu-inline)))
+   (if (use-menus?)
+       (=> (balloon (icon "tm_preferences.xpm") "Change the TeXmacs preferences")
+           (link preferences-menu)))
+@@ -170,7 +172,8 @@
+       ;;(=> (balloon (icon "tm_language.xpm") "Select a language")
+       ;;(link global-language-menu))
+       )
+-  (=> (balloon (icon "tm_cancel.xpm") "Close") (link close-menu))
++  (if (not (tessera-editor?))
++      (=> (balloon (icon "tm_cancel.xpm") "Close") (link close-menu)))
+   /
+   ((balloon (icon "tm_cut.xpm") "Cut text")
+    (kbd-cut))
+@@ -193,8 +196,8 @@
+   /
+   ((balloon (icon "tm_back.xpm") "Browse back")
+    (cursor-history-backward))
+-  ((balloon (icon "tm_reload.xpm") "Reload")
+-   (revert-buffer))
++  (if (not (tessera-editor?))
++      ((balloon (icon "tm_reload.xpm") "Reload") (revert-buffer)))
+   ((balloon (icon "tm_forward.xpm") "Browse forward")
+    (cursor-history-forward))
+   (if (in-presentation?)
+--- a/src/TeXmacs/progs/texmacs/menus/view-menu.scm
++++ b/src/TeXmacs/progs/texmacs/menus/view-menu.scm
+@@ -156,10 +156,17 @@
+   (if (not (tessera-editor?))
+       ("Header bars" (toggle-visible-header)))
+   (when (visible-header?)
++    (if (tessera-editor?)
++        (-> "Toolbars"
++            ("Quick actions" (toggle-visible-icon-bar 0))
++            ("Editing tools" (toggle-visible-icon-bar 1))
++            ("Structure controls" (toggle-visible-icon-bar 2))
++            ("Document tools" (toggle-visible-icon-bar 3))))
++    (if (not (tessera-editor?))
+         ("Main icon bar" (toggle-visible-icon-bar 0))
+         ("Mode dependent icons" (toggle-visible-icon-bar 1))
+         ("Focus dependent icons" (toggle-visible-icon-bar 2))
+-        ("User provided icons" (toggle-visible-icon-bar 3)))
++        ("User provided icons" (toggle-visible-icon-bar 3))))
+   ("Status bar" (toggle-visible-footer))
+   (if (or (vue-gui?) (ns-gui?))
+       (when (visible-footer?)
+--- a/src/src/Plugins/Vue/vue_widget.cpp
++++ b/src/src/Plugins/Vue/vue_widget.cpp
+@@ -6452,8 +6452,19 @@
+ }
+
+ static void
+-layout_bar_content (int key, vue_widget content, Clay_Color bg) {
++layout_bar_content (int key, vue_widget content, Clay_Color bg,
++                    const char* studio_label= NULL) {
+   with_test_context c (bar_test_name (key));
++  if (studio_label != NULL && tessera_menu_style &&
++      current_window->layout_w >= ui_pxf (1440)) {
++    CLAY(CLAY_IDI ("studio_bar_label", key), {
++      .layout= {
++        .sizing= { CLAY_SIZING_FIXED(ui_pxf (192)), CLAY_SIZING_GROW(0) },
++        .padding= { ui_px (14), 0, 0, 0 },
++        .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
++      layout_text (studio_label, WIDGET_STYLE_MINI | WIDGET_STYLE_BOLD,
++                   theme_color (Clay_Color {63, 101, 88, 255}));
++  }
+   Clay_ElementId clip_id= CLAY_IDI ("bar_clip", key);
+   CLAY(clip_id, {
+     .layout= {
+@@ -6579,7 +6590,7 @@
+     {
+       if (!is_nil (main_icons)) {
+         in_tool_bar= true;
+-        layout_bar_content (8*id + 1, main_icons, color_background);
++        layout_bar_content (8*id + 1, main_icons, color_background, "QUICK ACTIONS");
+         in_tool_bar= false;
+       }
+     }
+@@ -6595,7 +6606,7 @@
+     {
+       if (!is_nil (mode_icons)) {
+         in_tool_bar= true;
+-        layout_bar_content (8*id + 2, mode_icons, the_theme.bar_mode);
++        layout_bar_content (8*id + 2, mode_icons, the_theme.bar_mode, "EDITING TOOLS");
+         in_tool_bar= false;
+       }
+     }
+@@ -6618,7 +6629,7 @@
+       {
+         if (!is_nil (focus_icons)) {
+           in_tool_bar= true;
+-          layout_bar_content (8*id + 3, focus_icons, the_theme.bar_focus);
++          layout_bar_content (8*id + 3, focus_icons, the_theme.bar_focus, "STRUCTURE");
+           in_tool_bar= false;
+         }
+       }

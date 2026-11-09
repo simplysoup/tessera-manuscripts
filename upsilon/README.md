@@ -26,6 +26,10 @@ The fourth patch styles the native menu bar for Tessera and gives the
 embedded File menu printing and additional native file formats.
 Tessera owns manuscript navigation, saving, sharing, and standard export.
 
+The fifth patch restores the native quick actions, mode tools, and
+structure controls as part of the editor. The quick actions omit the file
+controls provided by Tessera. Each toolbar can be toggled in View → Toolbars.
+
 The full Upsilon web target retains its own storage, tabs, and plug-ins.
 Tessera's frontend owns document persistence. Native preferences in the
 embedded runtime are transient. The build still includes the C++ editor,
