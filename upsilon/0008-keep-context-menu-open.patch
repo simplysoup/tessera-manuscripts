@@ -1,0 +1,13 @@
+diff --git a/src/src/Edit/Interface/edit_mouse.cpp b/src/src/Edit/Interface/edit_mouse.cpp
+index 8429752..0000000 100644
+--- a/src/src/Edit/Interface/edit_mouse.cpp
++++ b/src/src/Edit/Interface/edit_mouse.cpp
+@@ -559,7 +559,7 @@ edit_interface_rep::mouse_any (string type, SI x, SI y, int mods, time_t t,
+     set_pointer ("XC_top_left_arrow");
+   if ((!move_like) && (type != "enter") && (type != "leave"))
+     set_input_normal ();
+-  if (!is_nil (popup_win) && (type != "leave")) {
++  if (!is_nil (popup_win) && (type != "leave") && (type != "release-right")) {
+     set_visibility (popup_win, false);
+     destroy_window_widget (popup_win);
+     popup_win= widget ();

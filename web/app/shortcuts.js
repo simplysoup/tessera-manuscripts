@@ -30,9 +30,17 @@ export function installShortcuts(runtime, { command, replay, hint, active, signa
   };
 
   runtime.addEventListener("keydown", event => {
-    if (!mode && event.key !== "F2") return;
     const inCanvas = event.target === runtime.document.body ||
       event.target.matches?.("#canvas, [data-tm-input]");
+    if (!mode && event.key === "Tab" && inCanvas && !event.isComposing &&
+        event.keyCode !== 229 && !event.altKey && !event.ctrlKey &&
+        !event.metaKey && active()) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!event.repeat) replay(event.shiftKey ? "S-tab" : "tab");
+      return;
+    }
+    if (!mode && event.key !== "F2") return;
     if (!inCanvas || event.isComposing || event.keyCode === 229 ||
         event.altKey || event.ctrlKey || event.metaKey || !active()) {
       reset();
