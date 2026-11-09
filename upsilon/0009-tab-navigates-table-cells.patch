@@ -1,0 +1,15 @@
+diff --git a/src/TeXmacs/progs/table/table-edit.scm b/src/TeXmacs/progs/table/table-edit.scm
+index c26ddaf..0290b87 100644
+--- a/src/TeXmacs/progs/table/table-edit.scm
++++ b/src/TeXmacs/progs/table/table-edit.scm
+@@ -217,6 +217,10 @@
+     (and-with c (cell-search-downwards t)
+       (cell-move-relative c 0 (if forwards? 1 -1)))))
+ 
++(tm-define (kbd-variant t forwards?)
++  (:require (table-markup-context? t))
++  (structured-horizontal t forwards?))
++
+ (tm-define (structured-vertical t downwards?)
+   (:require (table-markup-context? t))
+   (with-focus-after t

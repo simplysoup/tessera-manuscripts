@@ -39,6 +39,10 @@ with the initial resources, and persists only TeXmacs' disposable font and
 file cache between embedded editor frames. Manuscripts and editor preferences
 remain in Tessera's own storage.
 
+The eighth keeps native right-click menus open after the mouse button is
+released. The ninth maps Tab and Shift+Tab to forward and backward table-cell
+navigation, including matrix cells.
+
 The full Upsilon web target retains its own storage, tabs, and plug-ins.
 Tessera's frontend owns document persistence. Native preferences in the
 embedded runtime are transient. The build still includes the C++ editor,
