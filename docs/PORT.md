@@ -4,7 +4,7 @@
 
 The shipped browser engine is built from
 [TeXmacs Upsilon f531d91](https://github.com/mgubi/texmacs/tree/f531d91ea039b67fc405c9eb771b9e54cdfad9b7)
-with Tessera's five patches applied in order. It uses Emscripten 6.0.10
+with Tessera's six patches applied in order. It uses Emscripten 6.0.10
 and MuPDF 1.28.5. The [engine asset hashes](ENGINE-SHA256.txt) identify
 the bundled files. Upstream license notices are in
 [upstream-licenses](upstream-licenses).
@@ -14,8 +14,9 @@ and the [embedded build instructions](upsilon/README.md).
 Apply the [native theme](upsilon/0001-theme-native-vue-widgets.patch),
 [embedded profile](upsilon/0002-embedded-editor-build.patch),
 [caret and fraction targets](upsilon/0003-embedded-caret-and-fraction-targets.patch),
-[studio menu](upsilon/0004-single-studio-menu.patch), and
-[contextual editing tools](upsilon/0005-contextual-editing-tools.patch) patches in order.
+[studio menu](upsilon/0004-single-studio-menu.patch),
+[contextual editing tools](upsilon/0005-contextual-editing-tools.patch), and
+[workspace styling](upsilon/0006-unified-studio-chrome.patch) patches in order.
 
 ## Source map
 

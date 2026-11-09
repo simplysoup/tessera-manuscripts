@@ -1,0 +1,105 @@
+--- a/src/src/Plugins/Vue/vue_widget.cpp
++++ b/src/src/Plugins/Vue/vue_widget.cpp
+@@ -287,10 +287,10 @@
+   .scrollbar= {91, 116, 105, 120},
+   .scrollbar_hover= {56, 123, 100, 190},
+   .bar_line= {220, 226, 216, 255},
+-  .bar_mode= {241, 245, 235, 255},
+-  .bar_focus= {253, 253, 248, 255},
++  .bar_mode= {249, 250, 245, 255},
++  .bar_focus= {249, 250, 245, 255},
+   .tab_inactive= {235, 240, 229, 255},
+-  .canvas= {235, 239, 230, 255},
++  .canvas= {238, 241, 233, 255},
+   .balloon= {253, 253, 248, 255},
+   .balloon_border= {205, 217, 206, 255},
+   .pre_edit= {241, 245, 235, 255},
+@@ -303,7 +303,8 @@
+ static bool tessera_menu_style= false;
+ static bool in_tessera_menu_bar= false;
+ static const Clay_Color tessera_menu_green= {24, 60, 51, 255};
+-static const Clay_Color tessera_menu_hover= {52, 100, 84, 255};
++static const Clay_Color tessera_menu_hover= {49, 92, 79, 255};
++static const Clay_Color tessera_toolbar_hover= {231, 239, 226, 255};
+ static const Clay_Color tessera_menu_text= {245, 248, 237, 255};
+
+ static const vue_theme vue_theme_dark= {
+@@ -2271,8 +2272,8 @@
+   float iw, ih;
+   if (!in_tool_bar || !icon_size (content, iw, ih)) return false;
+   float side= max (iw, ih);
+-  if (in_side_bar) side= max (side, ui_pxf (48));
+-  uint16_t pad= ui_px (tool_button_pad);
++  if (in_side_bar || tessera_menu_style) side= max (side, ui_pxf (48));
++  uint16_t pad= ui_px (tessera_menu_style ? 8 : tool_button_pad);
+   padding= CLAY_PADDING_ALL (pad);
+   s= { CLAY_SIZING_FIXED (side + 2 * pad), CLAY_SIZING_FIXED (side + 2 * pad) };
+   return true;
+@@ -2308,8 +2309,11 @@
+   }
+   bool square= down && !in_footer && square_tool_button (d.w, s, padding);
+   bool studio_title= in_tessera_menu_bar && parent_menu == 0 && down;
+-  if (studio_title) padding= { ui_px (16), ui_px (16), ui_px (12), ui_px (9) };
+-  Clay_Color hover= studio_title ? tessera_menu_hover : highlight_on (color_behind);
++  if (studio_title) padding= { ui_px (16), ui_px (16), ui_px (10), ui_px (7) };
++  bool studio_tool= tessera_menu_style && in_tool_bar && down && !in_footer;
++  if (studio_title || studio_tool) rad= ui_pxf (12);
++  Clay_Color hover= studio_title ? tessera_menu_hover
++                    : studio_tool ? tessera_toolbar_hover : highlight_on (color_behind);
+   CLAY(button_id, {
+     .layout= {
+       .sizing= s,
+@@ -3479,6 +3483,10 @@
+                  : in_tool_bar ? CLAY_PADDING_ALL(ui_px (tool_button_pad))
+                  : CLAY_PADDING_ALL(ui_px (7));
+         radius= ui_inner_corners (menu_round, menu_inset); // as the menu items
++        if (tessera_menu_style && in_tool_bar && !in_footer) {
++          radius= CLAY_CORNER_RADIUS(ui_pxf (12));
++          hl= tessera_toolbar_hover;
++        }
+       }
+       if (down || pressed) bg= color_pressed;
+       else if (hot) bg= hl;
+@@ -6462,8 +6470,8 @@
+         .sizing= { CLAY_SIZING_FIXED(ui_pxf (192)), CLAY_SIZING_GROW(0) },
+         .padding= { ui_px (14), 0, 0, 0 },
+         .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }}})
+-      layout_text (studio_label, WIDGET_STYLE_MINI | WIDGET_STYLE_BOLD,
+-                   theme_color (Clay_Color {63, 101, 88, 255}));
++      layout_text (studio_label, WIDGET_STYLE_MINI | WIDGET_STYLE_MONOSPACED |
++                   WIDGET_STYLE_BOLD, theme_color (Clay_Color {77, 112, 100, 255}));
+   }
+   Clay_ElementId clip_id= CLAY_IDI ("bar_clip", key);
+   CLAY(clip_id, {
+@@ -6558,7 +6566,7 @@
+       .layoutDirection= CLAY_TOP_TO_BOTTOM }})
+   {
+     Clay_Color menu_bg= tessera_menu_style ? tessera_menu_green : color_background;
+-    float menu_height= tessera_menu_style ? ui_pxf (84) : bar_menu_h;
++    float menu_height= tessera_menu_style ? ui_pxf (74) : bar_menu_h;
+     if (visibility[0]) CLAY(CLAY_ID_LOCAL("MainMenuBar"), {
+       .layout= {
+         .sizing= {
+@@ -6578,6 +6586,7 @@
+     }
+     string place= icon_bars_place ();
+     bool side= place != "top", right= place == "right";
++    Clay_Color quick_bg= tessera_menu_style ? the_theme.bar_mode : color_background;
+     if (visibility[0] && visibility[1] && !side) CLAY(CLAY_ID_LOCAL("MainToolbar"), {
+       .layout= {
+          .sizing= {
+@@ -6585,12 +6594,12 @@
+            .height= CLAY_SIZING_FIT(.min= bar_main_h) },
+          .padding= { bar_hpad, bar_hpad, 0, 0 },
+          .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+-      .backgroundColor= color_background,
++      .backgroundColor= quick_bg,
+       .border= { .color= the_theme.bar_line, .width= { .bottom= 2 } }})
+     {
+       if (!is_nil (main_icons)) {
+         in_tool_bar= true;
+-        layout_bar_content (8*id + 1, main_icons, color_background, "QUICK ACTIONS");
++        layout_bar_content (8*id + 1, main_icons, quick_bg, "QUICK ACTIONS");
+         in_tool_bar= false;
+       }
+     }

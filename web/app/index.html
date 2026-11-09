@@ -72,24 +72,18 @@
     <header class="editor-header">
       <div class="editor-left">
         <button id="back" class="button outline editor-back" aria-label="Back to manuscripts"><svg><use href="#arrow-back"/></svg><span>Manuscripts</span></button>
-        <div class="editor-name"><div class="eyebrow">MANUSCRIPT STUDIO</div><button id="rename" class="title-button" disabled aria-label="Rename manuscript"><span id="title"></span><svg><use href="#edit"/></svg></button></div>
+        <span class="studio-mark" aria-hidden="true"><svg><use href="#logo"/></svg></span>
+        <div class="editor-name"><div class="eyebrow">TESSERA STUDIO</div><button id="rename" class="title-button" disabled aria-label="Rename manuscript"><span id="title"></span><svg><use href="#edit"/></svg></button></div>
+        <button id="resume-manuscript" class="button outline" type="button" hidden>Return to manuscript</button>
       </div>
       <div class="editor-actions">
-        <span id="save-status" class="save-status" role="status"><span aria-hidden="true"></span><span class="save-status-width" aria-hidden="true">Live · synced</span><span class="save-status-label">Opening editor</span></span>
+        <span id="save-status" class="save-status" role="status"><span aria-hidden="true"></span><span class="save-status-width" aria-hidden="true">Live · synced</span><span class="save-status-label">Opening</span></span>
         <button id="save" class="button outline" type="button" disabled>Save</button>
         <details id="exports" class="exports"><summary class="button outline" aria-disabled="true">Export <svg><use href="#down"/></svg></summary><div class="export-menu"><button data-format="pdf">PDF <span>.pdf</span></button><button data-format="latex">LaTeX <span>.tex</span></button><button data-format="texmacs">TeXmacs <span>.tm</span></button></div></details>
         <button id="share" class="button dark" disabled><svg><use href="#share-icon"/></svg> Share</button>
       </div>
     </header>
     <main class="writing-desk">
-      <div class="desk-label">
-        <div class="desk-context"><span class="desk-label-prefix">AT THE CURSOR</span><span id="editor-context">Document</span></div>
-        <div class="desk-views">
-          <span id="shortcut-label" title="Press F2 while editing to see the shortcuts.">F2 SHORTCUTS</span>
-          <span id="mode-label">TYPESET VIEW</span>
-          <button id="resume-manuscript" class="button outline" type="button" hidden>Return to manuscript</button>
-        </div>
-      </div>
       <div class="paper-frame">
         <p id="shortcut-hint" class="notice" role="status"></p>
         <div id="editor-host" class="editor-host" data-ready="false" inert></div>
@@ -100,7 +94,17 @@
         </div>
       </div>
     </main>
-    <footer class="editor-footer"><span><span class="small-dot"></span> <span id="draft-kind">Local draft</span></span><span id="editor-hint">Your manuscript is stored in this browser.</span></footer>
+    <footer class="editor-footer">
+      <div class="desk-context">
+        <span class="desk-label-prefix">AT THE CURSOR</span><span id="editor-context">Document</span>
+      </div>
+      <span id="editor-hint">Your manuscript is stored in this browser.</span>
+      <div class="desk-views">
+        <span id="shortcut-label" title="Press F2 while editing to see the shortcuts."><kbd>F2</kbd> Shortcuts</span>
+        <span id="mode-label">TYPESET VIEW</span>
+        <span class="draft-state"><span class="small-dot"></span> <span id="draft-kind">Local draft</span></span>
+      </div>
+    </footer>
   </section>
   <input type="file" id="file" accept=".tex,.tm" hidden>
   <dialog id="dialog"><form method="dialog" id="dialog-form"><div class="eyebrow" id="dialog-label"></div><h2 id="dialog-title"></h2><p id="dialog-copy"></p><label id="name-field" hidden><span id="name-label">Manuscript name</span><input id="name" maxlength="90" autocomplete="off"></label><div class="dialog-actions"><button class="button outline" value="cancel" type="submit" formnovalidate>Cancel</button><button class="button dark" id="dialog-confirm" value="confirm" type="submit">Done</button></div></form></dialog>

@@ -67,6 +67,7 @@ function boot(host) {
     const runtime = engine();
     const view = runtime.TeXmacs.scheme(`(begin
       (set-preference "header" "on")
+      (set-preference "icon set" "lucide")
       (set-preference "main icon bar" "on")
       (set-preference "mode dependent icons" "on")
       (set-preference "focus dependent icons" "on")

@@ -92,7 +92,7 @@ async function load(path) {
   }
   if (path === "/examples/" + file && examples.has(file)) return readFile(join(root, "web/examples", file));
   if (path === "/legal/" || path === "/legal/index.html") return readFile(join(root, "web/legal/index.html"));
-  if (path === "/legal/upsilon/" + file && /^(?:README\.md|000[1-5]-[a-z-]+\.patch)$/u.test(file)) {
+  if (path === "/legal/upsilon/" + file && /^(?:README\.md|000[1-6]-[a-z-]+\.patch)$/u.test(file)) {
     return readFile(join(root, "upsilon", file)).catch(error => {
       if (error.code !== "ENOENT") throw error;
     });

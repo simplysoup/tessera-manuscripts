@@ -202,7 +202,7 @@ async function openDraft(id, shared) {
     $("resume-manuscript").hidden = true;
     $("draft-kind").textContent = room ? "Live manuscript" : "Local draft";
     studioUrl(id, room);
-    status("Opening editor", "busy");
+    status("Opening", "busy");
     enable(false);
     session.editor = await mountEditor($("editor-host"), draft, session.controller.signal, {
       onShortcut: insert,

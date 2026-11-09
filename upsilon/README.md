@@ -30,6 +30,10 @@ The fifth patch restores the native quick actions, mode tools, and
 structure controls as part of the editor. The quick actions omit the file
 controls provided by Tessera. Each toolbar can be toggled in View → Toolbars.
 
+The sixth patch aligns the native menu, toolbar surface, icon targets, and
+paper surround with the Tessera workspace frame. The embedded editor
+selects the Upsilon Lucide icon set by default.
+
 The full Upsilon web target retains its own storage, tabs, and plug-ins.
 Tessera's frontend owns document persistence. Native preferences in the
 embedded runtime are transient. The build still includes the C++ editor,
