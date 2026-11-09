@@ -19,6 +19,11 @@ export const documents = {
   list: () => request("readonly", store => store.getAll()),
   get: id => request("readonly", store => store.get(id)),
   put: draft => request("readwrite", store => store.put(draft)),
+  replace: (id, draft) => request("readwrite", store => {
+    const saved = store.put(draft);
+    if (id && id !== draft.id) store.delete(id);
+    return saved;
+  }),
   remove: id => request("readwrite", store => store.delete(id)),
 };
 

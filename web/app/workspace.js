@@ -95,7 +95,8 @@ function showDrafts() {
     name.textContent = draft.title;
     const meta = document.createElement("span");
     meta.className = "draft-meta";
-    meta.textContent = draft.room ? "Live manuscript" : "Edited " + new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(draft.updated);
+    meta.textContent = draft.room ? "Shared" : "Edited " + new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(draft.updated);
+    meta.classList.toggle("shared", Boolean(draft.room));
     text.append(name, meta);
     open.append(mark, text);
     open.addEventListener("click", () => openDraft(draft.id));
@@ -104,8 +105,12 @@ function showDrafts() {
     remove.setAttribute("aria-label", "Delete " + draft.title);
     remove.append(icon("trash"));
     remove.addEventListener("click", () => ask({
-      label: "LOCAL MANUSCRIPT", title: "Delete this draft?",
-      copy: "“" + draft.title + "” will be removed from this browser.", confirm: "Delete draft",
+      label: draft.room ? "SHARED MANUSCRIPT" : "PRIVATE MANUSCRIPT",
+      title: draft.room ? "Remove this manuscript from your list?" : "Delete this draft?",
+      copy: draft.room
+        ? "“" + draft.title + "” will disappear from this browser. The shared manuscript and its invitation link will keep working for others."
+        : "“" + draft.title + "” will be removed from this browser.",
+      confirm: draft.room ? "Remove from list" : "Delete draft",
       action: async () => {
         const release = await claim(draft.id);
         if (!release) throw new Error("Close this manuscript in the other tab before deleting it.");
@@ -169,24 +174,23 @@ function studioUrl(id, room) {
   history.replaceState(null, "", url);
 }
 
-async function openDraft(id, shared) {
+async function openDraft(id, shared, { replaceId } = {}) {
   if (state) return;
   const session = { controller: new AbortController(), busy: false };
   state = session;
   try {
     const local = await documents.get(id);
-    const room = shared || local?.room;
+    const roomId = shared ? id : local?.roomId ?? (local?.room ? id : null);
+    const room = Boolean(roomId);
     if (!room) {
       session.release = await claim(id);
       if (!session.release) throw new Error("This draft is already open in another tab.");
       if (!local) throw new Error("This manuscript is unavailable in this browser.");
     }
     const draft = room ? {
-      ...await readLink("room", id, session.controller.signal), id, room: true, updated: Date.now(),
+      ...await readLink("room", roomId, session.controller.signal), id: local?.id ?? roomId,
+      roomId, room: true, updated: Date.now(),
     } : local;
-    if (room && !local) {
-      await documents.put({ id, room: true, title: draft.title, updated: draft.updated });
-    }
     session.draft = draft;
     $("title").textContent = draft.title;
     $("studio").hidden = false;
@@ -200,8 +204,9 @@ async function openDraft(id, shared) {
     $("cover-title").textContent = "Opening your manuscript";
     $("cover-copy").textContent = "Getting the writing room ready. You can go back while it loads.";
     $("resume-manuscript").hidden = true;
-    $("draft-kind").textContent = room ? "Live manuscript" : "Local draft";
-    studioUrl(id, room);
+    $("draft-kind").textContent = "Shared";
+    $("draft-state").hidden = !room;
+    studioUrl(room ? roomId : id, room);
     status("Opening", "busy");
     enable(false);
     session.editor = await mountEditor($("editor-host"), draft, session.controller.signal, {
@@ -210,13 +215,16 @@ async function openDraft(id, shared) {
     });
     if (state !== session) return;
     if (room) {
-      session.room = connectRoom(id, session.editor, (message, kind, error) => {
+      session.room = connectRoom(roomId, session.editor, (message, kind, error) => {
         if (state !== session) return;
         status(message, kind);
         if (message === "Sync paused") $("editor-hint").textContent = error.message + " Your local edits are still here. Use Export to keep a copy.";
       }, session.controller.signal);
       await session.room.start();
       if (state !== session) return;
+      await documents.replace(replaceId ?? local?.id, {
+        id: draft.id, roomId, room: true, title: draft.title, updated: draft.updated,
+      });
     }
     syncView(session.editor);
     $("editor-host").dataset.ready = "true";
@@ -225,7 +233,7 @@ async function openDraft(id, shared) {
     $("editor-hint").textContent = "Tools follow the cursor. Choose View → Toolbars to control which rows are visible.";
     enable(true);
     if (draft.format === "tex") await save(session, true);
-    else if (!room) status("Saved here");
+    else if (!room) status("Saved");
   } catch (error) {
     if (state !== session) return;
     if ($("studio").hidden) {
@@ -311,7 +319,7 @@ async function leave() {
     returnToLibrary(session);
   } catch {
     ask({
-      label: session.room ? "LIVE MANUSCRIPT" : "LOCAL MANUSCRIPT", title: "The latest changes couldn’t be saved",
+      label: session.room ? "SHARED MANUSCRIPT" : "PRIVATE MANUSCRIPT", title: "The latest changes couldn’t be saved",
       copy: "Cancel to keep editing or export a recovery copy. Returning now opens the library with the last saved version.",
       confirm: "Return with last saved",
       action: () => returnToLibrary(session),
@@ -361,7 +369,7 @@ $("file").addEventListener("change", async event => {
 
 $("about").addEventListener("click", () => ask({
   label: "A QUICK TOUR", title: "Your writing room",
-  copy: "Try Math playground to explore the editor. Click the page to edit and use Source to see its structure. Share lets you start a live room or send a copy.",
+  copy: "Try Math playground to explore the editor. Click the page to edit and use Source to see its structure. Share lets you invite someone to edit together or send an editable copy.",
 }));
 $("back").addEventListener("click", leave);
 $("save").addEventListener("click", async () => {
@@ -429,10 +437,11 @@ function showShare(session) {
   $("start-room").hidden = Boolean(session.room);
   $("start-room").disabled = false;
   $("room-link-row").hidden = !session.room;
-  $("room-link").value = session.room ? linkUrl("room", session.draft.id) : "";
+  $("room-link").value = session.room ? linkUrl("room", session.draft.roomId) : "";
   $("room-help").textContent = session.room
-    ? "Open this link in another window to edit the same manuscript."
-    : "Start a shared room from this draft, then invite another editor.";
+    ? "Anyone with workspace access and this invitation link can edit the same manuscript."
+    : "This changes the manuscript from private to shared. Anyone with workspace access and the invitation link can edit it.";
+  $("start-room").textContent = "Share & collaborate";
   $("start-copy").hidden = false;
   $("start-copy").disabled = false;
   $("copy-link-row").hidden = true;
@@ -456,8 +465,8 @@ $("start-room").addEventListener("click", async () => {
     const showLink = $("share-dialog").open;
     $("share-dialog").close();
     await leave();
-    if (state === session) throw new Error("Save this draft before opening the live room.");
-    await openDraft(id, true);
+    if (state === session) throw new Error("Save this draft before sharing it.");
+    await openDraft(id, true, { replaceId: session.draft.id });
     if (showLink && state?.room && !$("editor-host").inert) showShare(state);
   } catch (error) {
     $("room-help").textContent = error.message;
@@ -524,7 +533,7 @@ async function openLink(url) {
 
 $("open-link").addEventListener("click", () => ask({
   label: "MANUSCRIPT LINKS", title: "Open a manuscript link",
-  copy: "Paste a Tessera live room or editable copy link.",
+  copy: "Paste a shared manuscript link or an editable copy link.",
   confirm: "Open link", name: "", field: "Manuscript link", maxLength: 12500,
   action: async value => {
     let url;

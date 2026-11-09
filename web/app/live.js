@@ -79,7 +79,7 @@ export function connectRoom(id, editor, onStatus, signal) {
       if (!patch) break;
       outgoing = { id: crypto.randomUUID(), revision, patch };
     }
-    if (!stopped) onStatus("Live · synced");
+    if (!stopped) onStatus("Synced");
   }
 
   function sync() {

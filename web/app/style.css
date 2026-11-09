@@ -68,6 +68,7 @@ h1,h2{font-family:var(--serif);font-weight:400;letter-spacing:-.052em;margin:0}
 .draft-open:hover strong{text-decoration:underline}
 .draft-name{display:grid;gap:3px;min-width:0}
 .draft-name strong,.title-button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.draft-meta.shared{color:#315f48;font-weight:650}
 .footer{border-top:1px solid var(--line);padding:13px 0;margin-top:25px;display:flex;justify-content:space-between;color:var(--muted);font-size:11px;gap:10px}
 /* The editor is the workspace, so it uses the full viewport. */
 .studio{--studio-green:#183c33;--studio-line:#315c4f;width:100%;height:100dvh;margin:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;background:#eef1e9;overflow:hidden}

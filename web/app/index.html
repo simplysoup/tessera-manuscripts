@@ -32,7 +32,7 @@
       <div class="top-inner">
         <a class="brand" href="/" aria-label="Tessera home"><span class="brand-icon"><svg><use href="#logo"/></svg></span>Tessera</a>
         <span class="top-divider"></span><span class="top-section">Manuscript studio</span>
-        <div class="top-actions"><span class="local-pill"><span></span> Local workspace</span><button class="icon-button" id="about" aria-label="Workspace help"><svg><use href="#help"/></svg></button></div>
+        <div class="top-actions"><span class="local-pill"><span></span> Private by default</span><button class="icon-button" id="about" aria-label="Workspace help"><svg><use href="#help"/></svg></button></div>
       </div>
     </header>
     <main class="main">
@@ -102,7 +102,7 @@
       <div class="desk-views">
         <span id="shortcut-label" title="Press F2 while editing to see the shortcuts."><kbd>F2</kbd> Shortcuts</span>
         <span id="mode-label">TYPESET VIEW</span>
-        <span class="draft-state"><span class="small-dot"></span> <span id="draft-kind">Local draft</span></span>
+        <span class="draft-state" id="draft-state" hidden><span class="small-dot"></span> <span id="draft-kind">Shared</span></span>
       </div>
     </footer>
   </section>
@@ -114,9 +114,9 @@
       <p>Send links to people with access to this private workspace.</p>
       <div class="share-panel">
         <label for="room-link">Edit together</label>
-        <p id="room-help">Start a shared room, then open its link in another window to edit the same manuscript.</p>
-        <button id="start-room" type="button" class="button dark">Start live editing</button>
-        <div class="copy-row" id="room-link-row" hidden><input id="room-link" type="text" readonly aria-describedby="room-help"><button id="room-link-button" type="button" class="button dark">Copy live link</button></div>
+        <p id="room-help">Share this manuscript to let another person edit it with you.</p>
+        <button id="start-room" type="button" class="button dark">Share &amp; collaborate</button>
+        <div class="copy-row" id="room-link-row" hidden><input id="room-link" type="text" readonly aria-describedby="room-help"><button id="room-link-button" type="button" class="button dark">Copy invitation link</button></div>
       </div>
       <div class="share-panel">
         <label for="copy-link">Send an editable copy</label>
