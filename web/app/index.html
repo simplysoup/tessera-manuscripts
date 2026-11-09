@@ -45,6 +45,10 @@
         <button id="auth-submit" class="button dark" type="submit">Sign in</button>
       </form>
       <p class="auth-footnote">Demo accounts are limited to invited participants. Email is used as your account name and is not verified.</p>
+      <div class="auth-local">
+        <button id="auth-local" class="button outline" type="button">Continue locally</button>
+        <p>No account needed. Drafts stay in this browser only; there is no cloud saving or link sharing. Export a file to move or share your work.</p>
+      </div>
     </main>
     <span class="auth-caption">Made for thinking on paper.</span>
   </section>
@@ -53,7 +57,7 @@
       <div class="top-inner">
         <a class="brand" href="/" aria-label="Tessera home"><span class="brand-icon"><svg><use href="#logo"/></svg></span>Tessera</a>
         <span class="top-divider"></span><span class="top-section">Manuscript studio</span>
-        <div class="top-actions"><span class="local-pill"><span></span> Private by default</span><button class="account-button" id="account" type="button" title="Sign out">Account</button><button class="icon-button" id="about" aria-label="Workspace help"><svg><use href="#help"/></svg></button></div>
+        <div class="top-actions"><span class="local-pill" id="storage-mode"><span></span><span id="storage-mode-label">Private by default</span></span><button class="account-button" id="account" type="button" title="Sign out">Account</button><button class="icon-button" id="about" aria-label="Workspace help"><svg><use href="#help"/></svg></button></div>
       </div>
     </header>
     <main class="main">
@@ -62,6 +66,7 @@
           <div class="eyebrow hero-label"><span></span> THE WRITING ROOM</div>
           <h1 id="hero-title">Space for<br>good ideas<span>.</span></h1>
           <p>Write papers, play with equations, and make your thinking visible.</p>
+          <p id="local-mode-note" class="local-mode-note" hidden>Local mode: drafts are saved only in this browser. Export a file to move or share them; account sign-in is needed for syncing and collaboration.</p>
           <div class="hero-actions"><button class="button bright" id="new"><svg><use href="#plus"/></svg> New manuscript</button><button class="button ghost" id="import"><svg><use href="#upload"/></svg> Import a file</button><button class="button ghost" id="open-link">Open a link</button></div>
         </div>
         <svg class="hero-art" viewBox="0 0 480 320" aria-hidden="true">

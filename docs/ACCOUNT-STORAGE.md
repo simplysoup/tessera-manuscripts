@@ -25,6 +25,13 @@ the invite secret or replace it after the demo to stop new registrations.
 Local `npm start` uses a fixed local-only identity so the account library can be
 used without creating a demo account.
 
+Visitors can also choose **Continue locally** without registering or signing
+in. Local drafts are stored only in that browser's IndexedDB. Local mode does
+not call the account library, create share links, or join collaborative rooms;
+users can import and export files, and must export to move or share work. Local
+drafts stay on the device if the user later signs in, but are only shown again
+when they choose local mode in that browser.
+
 ## Data model
 
 - `user_manuscripts` stores private manuscripts with an immutable owner ID.

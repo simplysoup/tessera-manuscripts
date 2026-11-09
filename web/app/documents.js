@@ -120,6 +120,7 @@ async function syncLibrary() {
     }
   }
   for (const draft of local) {
+    if (draft.localOnly || draft.ownerId === "browser-local") continue;
     if (draft.room && draft.ownerId === account.sub && !cloudById.has(draft.id)) synced.push(draft);
     else if (!cloudById.has(draft.id) && draft.ownerId === account.sub && draft.format !== "tm") synced.push(draft);
   }
@@ -127,8 +128,25 @@ async function syncLibrary() {
   return synced;
 }
 
+async function listLocal() {
+  account = { sub: "browser-local", localOnly: true };
+  const local = await request("readonly", store => store.getAll());
+  const drafts = [];
+  for (const draft of local) {
+    if (draft.room || (draft.ownerId && draft.ownerId !== "browser-local")) continue;
+    if (!draft.localOnly || !draft.ownerId) {
+      draft.localOnly = true;
+      draft.ownerId = "browser-local";
+      await request("readwrite", store => store.put(draft));
+    }
+    drafts.push(draft);
+  }
+  return drafts;
+}
+
 export const accountState = {
   current: () => account,
+  initializeLocal: listLocal,
   initialize: async () => {
     try { return await syncLibrary(); }
     catch (error) {
@@ -139,6 +157,7 @@ export const accountState = {
   register: (email, password, invite) => cloud("/api/auth/register", { method: "POST", body: { email, password, invite } }),
   login: (email, password) => cloud("/api/auth/login", { method: "POST", body: { email, password } }),
   logout: async () => {
+    if (account?.localOnly) { account = null; return; }
     if (account?.local) return;
     await cloud("/api/auth/logout", { method: "POST", body: {} });
     account = null;
@@ -147,15 +166,19 @@ export const accountState = {
 };
 
 export const cloudDocuments = {
-  list: async () => syncLibrary(),
+  list: async () => account?.localOnly ? listLocal() : syncLibrary(),
   get: async id => {
     const draft = await request("readonly", store => store.get(id));
+    if (account?.localOnly) return draft?.localOnly && draft.ownerId === account.sub ? draft : undefined;
     return draft?.ownerId === account?.sub ? draft : undefined;
   },
   put: async draft => {
-    if (account && !draft.room) draft.ownerId = account.sub;
+    if (account?.localOnly && !draft.room) {
+      draft.ownerId = account.sub;
+      draft.localOnly = true;
+    } else if (account && !draft.room) draft.ownerId = account.sub;
     await request("readwrite", store => store.put(draft));
-    if (account && !draft.room && draft.format === "tm") {
+    if (account && !account.localOnly && !draft.room && draft.format === "tm") {
       const create = !cloudIds.has(draft.id);
       await writeCloud(draft, create);
       cloudIds.add(draft.id);
@@ -163,20 +186,23 @@ export const cloudDocuments = {
     return draft;
   },
   replace: async (id, draft) => {
-    if (account) draft.ownerId = account.sub;
+    if (account?.localOnly) {
+      draft.ownerId = account.sub;
+      draft.localOnly = true;
+    } else if (account) draft.ownerId = account.sub;
     await request("readwrite", store => {
       const saved = store.put(draft);
       if (id && id !== draft.id) store.delete(id);
       return saved;
     });
-    if (draft.room && account) {
+    if (draft.room && account && !account.localOnly) {
       await cloud("/api/library/" + draft.roomId + "/seen", { method: "POST", body: {} });
       if (id && id !== draft.id && cloudIds.has(id)) {
         await cloud("/api/library/" + id, { method: "DELETE" });
         cloudIds.delete(id);
       }
     }
-    else if (account && draft.format === "tm") {
+    else if (account && !account.localOnly && draft.format === "tm") {
       await writeCloud(draft, true);
       cloudIds.add(draft.id);
     }
@@ -184,7 +210,7 @@ export const cloudDocuments = {
   },
   remove: async id => {
     const draft = await request("readonly", store => store.get(id));
-    if (account && draft?.ownerId === account.sub) {
+    if (account && !account.localOnly && draft?.ownerId === account.sub) {
       if (draft.room) await cloud("/api/library/" + draft.roomId + "/remove", { method: "DELETE" });
       else {
         await cloud("/api/library/" + id, { method: "DELETE" });

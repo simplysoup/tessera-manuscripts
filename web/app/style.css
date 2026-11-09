@@ -24,6 +24,9 @@ button:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{o
 #auth-submit{width:100%;margin-top:3px;min-height:43px}
 .auth-error{margin:0!important;padding:10px 11px;border-radius:8px;background:#faece5;color:#803e2b!important;font-size:12px}
 .auth-card .auth-footnote{margin:19px 0 0;font-size:11px;line-height:1.55}
+.auth-local{margin-top:21px;padding-top:18px;border-top:1px solid var(--line)}
+.auth-local button{width:100%;min-height:42px}
+.auth-local p{margin:9px 0 0;color:var(--muted);font-size:11px;line-height:1.55;text-align:center}
 .auth-caption{align-self:end;justify-self:end;color:var(--muted);font-size:11px}
 button svg,summary svg,.search svg,.brand svg,.template svg,.draft-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
 .topbar{background:var(--white);border-bottom:1px solid var(--line)}
@@ -55,6 +58,7 @@ h1,h2{font-family:var(--serif);font-weight:400;letter-spacing:-.052em;margin:0}
 .hero h1{font-size:clamp(53px,7vw,83px);line-height:.91;margin:14px 0 13px}
 .hero h1 span{color:var(--lime)}
 .hero p{font-size:14px;color:#e0e9dc;margin:0 0 22px;line-height:1.5}
+.hero .local-mode-note{max-width:540px;margin:0 0 17px;padding:10px 12px;border:1px solid #a5cbb74d;border-radius:8px;background:#ffffff0b;color:#e0e9dc;font-size:12px;line-height:1.5}
 .hero-art{position:absolute;top:0;right:0;height:100%;width:min(52%,560px);opacity:.95}
 .hero-actions{display:flex;flex-wrap:wrap;gap:8px}
 .button{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 12px;min-height:37px;border-radius:8px;border:1px solid transparent;white-space:nowrap;font-size:13px;font-weight:620}

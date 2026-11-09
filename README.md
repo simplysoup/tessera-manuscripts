@@ -48,6 +48,8 @@ upstream sources and build recipe.
 The public demo uses Tessera email/password accounts gated by a shared invite
 code. Account storage, demo limits, and setup are described in
 [Account storage](docs/ACCOUNT-STORAGE.md).
+Visitors can instead continue locally without signing in; those manuscripts
+stay in browser storage and can be moved or shared only by exporting a file.
 
 ## Verify
 

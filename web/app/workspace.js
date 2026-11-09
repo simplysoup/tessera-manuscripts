@@ -162,6 +162,9 @@ $("dialog").addEventListener("close", async () => {
 function enable(ready) {
   for (const id of ["rename", "save", "share", "feature-search"]) $(id).disabled = !ready;
   $("rename").disabled ||= Boolean(state?.draft?.room);
+  const localOnly = Boolean(accountState.current()?.localOnly);
+  $("share").disabled ||= localOnly;
+  $("share").title = localOnly ? "Local manuscripts can’t be shared by link. Export a file instead." : "Share manuscript";
   const exports = $("exports");
   exports.firstElementChild.setAttribute("aria-disabled", String(!ready));
   for (const button of exports.querySelectorAll("button")) button.disabled = !ready;
@@ -232,10 +235,15 @@ async function openDraft(id, shared, { replaceId } = {}) {
     $("editor-host").dataset.ready = "true";
     $("editor-host").inert = false;
     $("editor-cover").hidden = true;
-    $("editor-hint").textContent = "Tools follow the cursor. Choose View → Toolbars to control which rows are visible.";
+    const localOnly = Boolean(accountState.current()?.localOnly);
+    $("editor-hint").textContent = localOnly
+      ? "Saved only in this browser. Export a file to move or share it."
+      : "Tools follow the cursor. Choose View → Toolbars to control which rows are visible.";
+    $("draft-kind").textContent = localOnly ? "Local only" : "Shared";
+    $("draft-state").hidden = !room && !localOnly;
     enable(true);
     if (draft.format === "tex") await save(session, true);
-    else if (!room) status("Saved");
+    else if (!room) status(localOnly ? "Saved locally" : "Saved");
   } catch (error) {
     if (state !== session) return;
     if ($("studio").hidden) {
@@ -550,9 +558,14 @@ function showShare(session) {
 }
 
 $("share").addEventListener("click", () => {
+  if (accountState.current()?.localOnly) {
+    notice("Local manuscripts can’t be shared by link. Export a file to share your work.");
+    return;
+  }
   if (state?.editor) showShare(state);
 });
 $("start-room").addEventListener("click", async () => {
+  if (accountState.current()?.localOnly) return notice("Sign in to create a shared manuscript link. You can also export a file.");
   const session = state;
   if (!session?.editor || session.room) return;
   $("start-room").disabled = true;
@@ -575,6 +588,7 @@ $("start-room").addEventListener("click", async () => {
   }
 });
 $("start-copy").addEventListener("click", async () => {
+  if (accountState.current()?.localOnly) return notice("Sign in to create an editable copy link. You can also export a file.");
   const session = state;
   if (!session?.editor) return;
   $("start-copy").disabled = true;
@@ -612,6 +626,7 @@ $("share-download").addEventListener("click", () => {
 const linkId = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
 
 async function openLink(url) {
+  if (accountState.current()?.localOnly) throw new Error("Local mode can’t open shared links. Sign in to use a link, or import an exported file.");
   if (url.origin !== location.origin) throw new Error("Enter a link from this Tessera workspace.");
   const room = url.searchParams.get("room");
   const copy = url.searchParams.get("copy");
@@ -692,14 +707,26 @@ async function enterWorkspace() {
   if (!user) return;
   $("auth-screen").hidden = true;
   $("library").hidden = false;
-  $("account").textContent = user.local ? "Local user" : user.email;
-  $("account").title = user.local ? "Local development identity" : user.email + " · Sign out";
+  $("account").textContent = user.localOnly ? "Sign in" : user.local ? "Local user" : user.email;
+  $("account").title = user.localOnly ? "Switch to account sign-in" : user.local ? "Local development identity" : user.email + " · Sign out";
   $("account").disabled = Boolean(user.local);
+  $("storage-mode-label").textContent = user.localOnly ? "Only on this browser" : "Private by default";
+  $("storage-mode").title = user.localOnly
+    ? "Local mode: drafts stay in this browser. Use Export to move or share files."
+    : "Account manuscripts are private until you share a link.";
+  $("local-mode-note").hidden = !user.localOnly;
+  $("open-link").disabled = Boolean(user.localOnly);
+  $("open-link").title = user.localOnly ? "Sign in to open manuscript links, or import an exported file." : "Open a shared or editable copy link";
   await refresh();
   if (initialUrl.searchParams.has("room") || initialUrl.searchParams.has("copy") ||
       initialUrl.searchParams.get("open") === "copy" || initialUrl.hash.startsWith("#copy=")) {
-    try { await openLink(initialUrl); }
-    catch (error) { notice(error.message); }
+    if (user.localOnly) {
+      studioUrl();
+      notice("Sign in to open a manuscript link. Local mode works with exported files.");
+    } else {
+      try { await openLink(initialUrl); }
+      catch (error) { notice(error.message); }
+    }
   } else {
     const requested = initialUrl.searchParams.get("draft");
     if (requested) await openDraft(requested);
@@ -709,6 +736,21 @@ async function enterWorkspace() {
 
 $("auth-login-tab").addEventListener("click", () => setAuthMode("login"));
 $("auth-register-tab").addEventListener("click", () => setAuthMode("register"));
+$("auth-local").addEventListener("click", async () => {
+  const button = $("auth-local");
+  button.disabled = true;
+  button.textContent = "Opening local workspace…";
+  try {
+    await accountState.initializeLocal();
+    await enterWorkspace();
+  } catch (error) {
+    $("auth-error").textContent = "Could not open browser storage. " + error.message;
+    $("auth-error").hidden = false;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Continue locally";
+  }
+});
 $("auth-form").addEventListener("submit", async event => {
   event.preventDefault();
   const submit = $("auth-submit");
