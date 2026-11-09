@@ -4,6 +4,9 @@ export const commandKeys = Object.freeze({
 });
 
 const commandsByKey = new Map(Object.entries(commandKeys).map(([command, key]) => [key, command]));
+const shortcutHint = Object.entries(commandKeys)
+  .map(([command, key]) => key.toUpperCase() + " " + (command === "root" ? "square root" : command))
+  .join(" · ") + " · 0 native keys · Esc cancel";
 const modifierKeys = new Map([["1", "Alt"], ["2", "Ctrl"], ["3", "Meta"], ["4", "Shift"]]);
 const nativePrefixes = new Map([["Meta", "M-"], ["Alt", "A-"], ["Ctrl", "C-"], ["Shift", "S-"]]);
 const nativeNames = new Map([
@@ -82,7 +85,7 @@ export function installShortcuts(runtime, { command, replay, hint, active, signa
       consume();
       if (event.repeat) return;
       if (mode) reset();
-      else setMode("commands", "Shortcut · F fraction · E equation · R root · 0 native keys · Esc cancel");
+      else setMode("commands", "Shortcuts · " + shortcutHint);
       return;
     }
     if (mode !== "commands") return;

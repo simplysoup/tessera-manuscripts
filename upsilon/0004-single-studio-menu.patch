@@ -1,0 +1,187 @@
+--- a/src/TeXmacs/progs/texmacs/menus/file-menu.scm
++++ b/src/TeXmacs/progs/texmacs/menus/file-menu.scm
+@@ -142,8 +142,13 @@
+ ;; Dynamic menus for formats
+ ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
++(define (other-file-formats formats)
++  (if (tessera-editor?)
++      (list-difference formats '("texmacs" "latex" "pdf"))
++      formats))
++
+ (tm-menu (import-menu flag?)
+-  (with l (converters-to-special "texmacs-file" "-file" #f)
++  (with l (other-file-formats (converters-to-special "texmacs-file" "-file" #f))
+     (for (fm l)
+       (let* ((name (format-get-name fm))
+              (load-text (string-append "Load " (string-downcase name) " file"))
+@@ -156,7 +161,7 @@
+ (tm-define (import-import-menu) (import-menu #f))
+
+ (tm-menu (export-menu flag?)
+-  (with l (converters-from-special "texmacs-file" "-file" #f)
++  (with l (other-file-formats (converters-from-special "texmacs-file" "-file" #f))
+     (for (fm l)
+       (let* ((name (format-get-name fm))
+              (save-text (string-append "Save " (string-downcase name) " file"))
+@@ -310,6 +315,32 @@
+
+
+ (menu-bind file-menu
++  (if (tessera-editor?) (link tessera-file-menu))
++  (if (not (tessera-editor?)) (link standalone-file-menu)))
++
++(menu-bind tessera-file-menu
++  ("Preview and print" (preview-buffer))
++  ("Print selected pages to file" (interactive choose-file-and-print-page-selection))
++  (if (use-menus?) (-> "Page setup" (link page-setup-menu)))
++  (if (use-popups?) ("Page setup" (open-page-setup)))
++  ---
++  (-> "Import other formats"
++      (link import-import-menu)
++      ("PDF with embedded document"
++       (choose-file wrapped-import-pdf-embeded-with-tm "Import PDF file" "pdf")))
++  (-> "Export other formats"
++      (link export-export-menu)
++      ---
++      ("PDF with embedded document"
++       (choose-file wrapped-print-to-pdf-embeded-with-tm "Save PDF file" "pdf"))
++      (when (pdf-encryption?)
++        ("PDF with password" (choose-file choose-pdf-with-password "Save PDF file" "pdf")))
++      ("PostScript"
++       (choose-file wrapped-print-to-file "Save PostScript file" "postscript"))
++      (when (selection-active-any?)
++        (=> "Export selection as image" (link export-as-image-menu)))))
++
++(menu-bind standalone-file-menu
+   ("New" (new-document))
+   ("Load" (open-document))
+   ("Revert" (revert-buffer))
+@@ -375,8 +406,9 @@
+       (link buffer-windows-menu)
+       ---
+       (group "Buffer in this window")
+-      ("New" (new-document*))
+-      ("Load" (open-document*))
++      (if (not (tessera-editor?))
++          ("New" (new-document*))
++          ("Load" (open-document*)))
+       (if (nnull? (buffer-invisible-list 25))
+           (-> "Hidden"
+               ---
+--- a/src/TeXmacs/progs/texmacs/menus/view-menu.scm
++++ b/src/TeXmacs/progs/texmacs/menus/view-menu.scm
+@@ -153,7 +153,8 @@
+
+   ("Snap to pages" (toggle-snap-to-pages))
+   ---
+-  ("Header bars" (toggle-visible-header))
++  (if (not (tessera-editor?))
++      ("Header bars" (toggle-visible-header)))
+   (when (visible-header?)
+         ("Main icon bar" (toggle-visible-icon-bar 0))
+         ("Mode dependent icons" (toggle-visible-icon-bar 1))
+--- a/src/TeXmacs/progs/texmacs/texmacs/tm-server.scm
++++ b/src/TeXmacs/progs/texmacs/texmacs/tm-server.scm
+@@ -41,6 +41,9 @@
+
+ (define (get-default-responsive-tab-mode)
+   (if (os-android?) "mobile" "side"))
++
++(tm-define (tessera-editor?)
++  (equal? (getenv "TEXMACS_TESSERA_EDITOR") "1"))
+
+ (define (notify-look-and-feel var val)
+   (set-message "Restart in order to let the new look and feel take effect"
+--- a/src/src/Plugins/Vue/vue_widget.cpp
++++ b/src/src/Plugins/Vue/vue_widget.cpp
+@@ -299,6 +299,12 @@
+   .radius= 8
+ };
+ #endif
++
++static bool tessera_menu_style= false;
++static bool in_tessera_menu_bar= false;
++static const Clay_Color tessera_menu_green= {24, 60, 51, 255};
++static const Clay_Color tessera_menu_hover= {52, 100, 84, 255};
++static const Clay_Color tessera_menu_text= {245, 248, 237, 255};
+
+ static const vue_theme vue_theme_dark= {
+   .shade= { {36, 36, 38, 255}, {52, 52, 55, 255},
+@@ -537,7 +543,8 @@
+   else dark= (SDL_GetSystemTheme () == SDL_SYSTEM_THEME_DARK);
+   the_theme= dark ? vue_theme_dark : vue_theme_light;
+ #ifdef __EMSCRIPTEN__
+-  if (N(forced) == 0 && vue_web_tessera_theme ()) {
++  tessera_menu_style= N(forced) == 0 && vue_web_tessera_theme ();
++  if (tessera_menu_style) {
+     dark= false;
+     the_theme= vue_theme_tessera;
+   }
+@@ -2300,6 +2307,9 @@
+     padding.right= 0;
+   }
+   bool square= down && !in_footer && square_tool_button (d.w, s, padding);
++  bool studio_title= in_tessera_menu_bar && parent_menu == 0 && down;
++  if (studio_title) padding= { ui_px (16), ui_px (16), ui_px (12), ui_px (9) };
++  Clay_Color hover= studio_title ? tessera_menu_hover : highlight_on (color_behind);
+   CLAY(button_id, {
+     .layout= {
+       .sizing= s,
+@@ -2310,14 +2320,16 @@
+     // flat: the bar or menu behind shows through unless hovered (the bars
+     // of the main window have different greys, hence highlight_on)
+     .backgroundColor= (hot_id == button_id.id || !is_nil (d.cw))
+-                      ? highlight_on (color_behind)
+-                      : (Clay_Color) { 0, 0, 0, 0 },
++                      ? hover : faded (hover),
+     .cornerRadius= CLAY_CORNER_RADIUS(rad) })
+   {
+     // items of vertical menus have the column of the check marks
+     if (!down && button_grow) layout_mark_column ();
+     if (vue_testing) vue_test_label= "";
++    Clay_Color label_text= the_theme.text;
++    if (studio_title) the_theme.text= tessera_menu_text;
+     concrete(d.w)->do_layout ();
++    the_theme.text= label_text;
+     if (vue_testing) d.test_label= vue_test_label; // the path of its menu
+     // the menus of the interactive footer say that they are menus
+     if (down && in_footer) layout_arrow ("<#25BE>", 3, dark_grey);
+@@ -2478,6 +2490,7 @@
+         current_bar= 0;
+         pull_float_depth++;
+         with_test_context c (d.test_label);
++        with_behind b (color_background);
+         concrete (d.cw)->do_layout ();
+         pull_float_depth--;
+         current_menu= save_menu;
+@@ -6533,18 +6546,24 @@
+       .padding= { 0, 0, 0, 0 }, .childGap= 0,
+       .layoutDirection= CLAY_TOP_TO_BOTTOM }})
+   {
++    Clay_Color menu_bg= tessera_menu_style ? tessera_menu_green : color_background;
++    float menu_height= tessera_menu_style ? ui_pxf (84) : bar_menu_h;
+     if (visibility[0]) CLAY(CLAY_ID_LOCAL("MainMenuBar"), {
+       .layout= {
+         .sizing= {
+           .width=  CLAY_SIZING_GROW(0),
+-          .height= CLAY_SIZING_FIT(.min= bar_menu_h) },
++          .height= CLAY_SIZING_FIT(.min= menu_height) },
+         .padding= { bar_hpad, bar_hpad, 0, 0 },
+         .childAlignment= { .y= CLAY_ALIGN_Y_CENTER }},
+-      .backgroundColor= color_background,
+-      .border= { .color= the_theme.bar_line, .width= { .bottom= 2 } }})
++      .backgroundColor= menu_bg,
++      .border= { .color= tessera_menu_style ? tessera_menu_hover : the_theme.bar_line,
++                  .width= { .bottom= 2 } }})
+     {
+-      if (!is_nil (main_menu))
+-        layout_bar_content (8*id + 0, main_menu, color_background);
++      if (!is_nil (main_menu)) {
++        in_tessera_menu_bar= tessera_menu_style;
++        layout_bar_content (8*id + 0, main_menu, menu_bg);
++        in_tessera_menu_bar= false;
++      }
+     }
+     string place= icon_bars_place ();
+     bool side= place != "top", right= place == "right";

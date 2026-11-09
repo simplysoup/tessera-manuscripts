@@ -1,6 +1,5 @@
 import { documents, claim } from "./documents.js";
 import { mountEditor, warmAssets } from "./engine.js";
-import { commandKeys } from "./shortcuts.js";
 import { readCopyLink } from "./sharing.js";
 import { connectRoom, createLink, linkUrl, readLink } from "./live.js";
 
@@ -154,14 +153,12 @@ $("dialog").addEventListener("close", async () => {
 });
 
 function enable(ready) {
-  for (const id of ["rename", "save", "source-mode", "share"]) $(id).disabled = !ready;
+  for (const id of ["rename", "save", "share"]) $(id).disabled = !ready;
   $("rename").disabled ||= Boolean(state?.draft?.room);
-  $("editor-commands").disabled = !ready;
-  for (const id of ["exports", "advanced-tools"]) {
-    $(id).firstElementChild.setAttribute("aria-disabled", String(!ready));
-    for (const button of $(id).querySelectorAll("button")) button.disabled = !ready;
-    if (!ready) $(id).open = false;
-  }
+  const exports = $("exports");
+  exports.firstElementChild.setAttribute("aria-disabled", String(!ready));
+  for (const button of exports.querySelectorAll("button")) button.disabled = !ready;
+  if (!ready) exports.open = false;
 }
 
 function studioUrl(id, room) {
@@ -202,8 +199,7 @@ async function openDraft(id, shared) {
     $("editor-cover").hidden = false;
     $("cover-title").textContent = "Opening your manuscript";
     $("cover-copy").textContent = "Getting the writing room ready. You can go back while it loads.";
-    $("source-mode").setAttribute("aria-pressed", "false");
-    $("native-tools").setAttribute("aria-pressed", "false");
+    $("resume-manuscript").hidden = true;
     $("draft-kind").textContent = room ? "Live manuscript" : "Local draft";
     studioUrl(id, room);
     status("Opening editor", "busy");
@@ -226,7 +222,7 @@ async function openDraft(id, shared) {
     $("editor-host").dataset.ready = "true";
     $("editor-host").inert = false;
     $("editor-cover").hidden = true;
-    $("editor-hint").textContent = "Click the page to write. Use Source to see the document tree.";
+    $("editor-hint").textContent = "Click the page to write. Use Document → Source to edit the source tree.";
     enable(true);
     if (draft.format === "tex") await save(session, true);
     else if (!room) status("Saved here");
@@ -325,9 +321,19 @@ async function leave() {
   }
 }
 
+function syncManuscriptMenu(editor) {
+  const active = editor.active();
+  $("resume-manuscript").hidden = active;
+  if ($("save").disabled === active) enable(active);
+  if (active) syncView(editor);
+  else {
+    $("editor-context").textContent = "Reference";
+    $("mode-label").textContent = "AUXILIARY VIEW";
+  }
+}
+
 function syncView(editor) {
   const source = editor.source();
-  $("source-mode").setAttribute("aria-pressed", String(source));
   $("mode-label").textContent = source ? "SOURCE VIEW" : "TYPESET VIEW";
   try { $("editor-context").textContent = editor.context() || "Document"; } catch { $("editor-context").textContent = "Document"; }
 }
@@ -388,37 +394,20 @@ $("rename").addEventListener("click", () => {
     },
   });
 });
-$("source-mode").addEventListener("click", () => {
-  try { state.editor.toggleSource(); syncView(state.editor); }
-  catch (error) { notice(error.message); }
-});
-$("native-tools").addEventListener("click", () => {
-  const next = $("native-tools").getAttribute("aria-pressed") !== "true";
+$("resume-manuscript").addEventListener("click", () => {
   try {
-    state.editor.setTools(next);
-    $("native-tools").setAttribute("aria-pressed", String(next));
-    $("advanced-tools").open = false;
+    state.editor.resume();
+    syncManuscriptMenu(state.editor);
   } catch (error) { notice(error.message); }
 });
-for (const id of ["exports", "advanced-tools"]) {
-  $(id).firstElementChild.addEventListener("click", event => {
-    if (!state?.editor) event.preventDefault();
-  });
-  $(id).addEventListener("toggle", () => {
-    if ($(id).open) $(id === "exports" ? "advanced-tools" : "exports").open = false;
-  });
-}
+$("exports").firstElementChild.addEventListener("click", event => {
+  if ($("save").disabled) event.preventDefault();
+});
 function insert(kind) {
   try { state.editor.insert(kind); }
   catch (error) { notice(error.message); }
 }
 
-for (const button of document.querySelectorAll("[data-insert]")) {
-  const kind = button.dataset.insert;
-  const label = button.getAttribute("aria-label") || button.textContent.trim();
-  button.title = `${label} (F2 then ${commandKeys[kind].toUpperCase()})`;
-  button.addEventListener("click", () => insert(kind));
-}
 function download(session, format) {
   const [suffix, type] = formats[format];
   const url = URL.createObjectURL(new Blob([session.editor.exportFile(format)], { type }));
@@ -547,11 +536,7 @@ $("open-link").addEventListener("click", () => ask({
 setInterval(() => {
   if (!state?.editor || state.busy || state.saving || state.leaving) return;
   try {
-    if (state.editor.active()) syncView(state.editor);
-    else if ($("native-tools").getAttribute("aria-pressed") !== "true") {
-      state.editor.setTools(true);
-      $("native-tools").setAttribute("aria-pressed", "true");
-    }
+    syncManuscriptMenu(state.editor);
     if (!state.room) save(state).catch(() => {});
   } catch { status("Editor unavailable", "error"); }
 }, 2500);

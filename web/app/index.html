@@ -82,44 +82,12 @@
       </div>
     </header>
     <main class="writing-desk">
-      <div class="writing-toolbar" aria-label="Writing controls">
-        <div class="ribbon-identity" aria-hidden="true"><svg><use href="#logo"/></svg><span>WRITING<br>STUDIO</span></div>
-        <fieldset id="editor-commands" class="ribbon-commands" disabled aria-label="Manuscript commands">
-          <div class="ribbon-group" role="group" aria-label="History">
-            <span class="ribbon-caption" aria-hidden="true">History</span>
-            <button class="ribbon-key" data-insert="undo" aria-label="Undo" title="Undo"><span aria-hidden="true">↶</span></button>
-            <button class="ribbon-key" data-insert="redo" aria-label="Redo" title="Redo"><span aria-hidden="true">↷</span></button>
-          </div>
-          <div class="ribbon-group" role="group" aria-label="Text formatting">
-            <span class="ribbon-caption" aria-hidden="true">Text</span>
-            <button class="ribbon-key" data-insert="bold" aria-label="Bold" title="Bold"><strong aria-hidden="true">B</strong></button>
-            <button class="ribbon-key" data-insert="italic" aria-label="Italic" title="Italic"><em aria-hidden="true">I</em></button>
-          </div>
-          <div class="ribbon-group ribbon-math" role="group" aria-label="Math">
-            <span class="ribbon-caption" aria-hidden="true">Math</span>
-            <button class="ribbon-key ribbon-labeled" data-insert="equation"><span aria-hidden="true">ƒ(x)</span> Equation</button>
-            <button class="ribbon-key ribbon-labeled" data-insert="fraction"><span aria-hidden="true">½</span> Fraction</button>
-            <button class="ribbon-key" data-insert="root" aria-label="Square root" title="Square root"><span aria-hidden="true">√</span></button>
-            <button class="ribbon-key" data-insert="superscript" aria-label="Superscript" title="Superscript"><span aria-hidden="true">x²</span></button>
-            <button class="ribbon-key" data-insert="subscript" aria-label="Subscript" title="Subscript"><span aria-hidden="true">xₙ</span></button>
-          </div>
-          <div class="ribbon-group" role="group" aria-label="Document structure">
-            <span class="ribbon-caption" aria-hidden="true">Structure</span>
-            <button class="ribbon-key ribbon-labeled" data-insert="section"><span aria-hidden="true">§</span> Section</button>
-            <button class="ribbon-key ribbon-labeled" data-insert="theorem"><span aria-hidden="true">∴</span> Theorem</button>
-          </div>
-        </fieldset>
-      </div>
       <div class="desk-label">
         <div class="desk-context"><span class="desk-label-prefix">AT THE CURSOR</span><span id="editor-context">Document</span></div>
         <div class="desk-views">
-          <span id="shortcut-label" title="Press F2 while editing, then a command key. Hover over a toolbar control to see its key.">F2 SHORTCUTS</span>
+          <span id="shortcut-label" title="Press F2 while editing to see the shortcuts.">F2 SHORTCUTS</span>
           <span id="mode-label">TYPESET VIEW</span>
-          <button id="source-mode" class="view-switch" type="button" aria-pressed="false" disabled><svg><use href="#code"/></svg> Source</button>
-          <details id="advanced-tools" class="exports">
-            <summary class="view-switch" aria-label="Advanced editor controls" aria-disabled="true">More <svg><use href="#down"/></svg></summary>
-            <div class="export-menu"><button id="native-tools" type="button" aria-pressed="false" disabled>Native TeXmacs menus</button></div>
-          </details>
+          <button id="resume-manuscript" class="button outline" type="button" hidden>Return to manuscript</button>
         </div>
       </div>
       <div class="paper-frame">

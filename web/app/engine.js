@@ -110,21 +110,21 @@ export async function mountEditor(host, draft, signal, { onShortcut, shortcutHin
     return bytes;
   }
 
-  function setTools(visible) {
-    const value = visible ? "#t" : "#f";
-    call(`(begin (show-header ${value}) (show-footer ${value})
-      (show-icon-bar 0 ${value}) (show-icon-bar 1 ${value}) (show-icon-bar 2 ${value}))`);
-    runtime.document.documentElement.toggleAttribute("data-tessera-tools", visible);
-    runtime.dispatchEvent(new runtime.Event("resize"));
-  }
   function requireManuscript() {
-    if (current() !== path) throw new Error("Use More → Native TeXmacs menus to select your manuscript.");
+    if (current() !== path) throw new Error("Return to your manuscript to use this shortcut.");
   }
   function rename(title) {
     call(`(buffer-set-title ${url} ${JSON.stringify(title)})`);
   }
   rename(draft.title);
-  setTools(false);
+  call(`(begin
+    (set-preference "header" "on")
+    (set-preference "main icon bar" "off")
+    (set-preference "mode dependent icons" "off")
+    (set-preference "focus dependent icons" "off")
+    (set-preference "user provided icons" "off")
+    (set-preference "status bar" "off")
+    (show-header #t))`);
   installShortcuts(runtime, {
     command: onShortcut,
     replay: key => runtime.TeXmacs.later(`(key-press ${JSON.stringify(key)})`),
@@ -134,7 +134,13 @@ export async function mountEditor(host, draft, signal, { onShortcut, shortcutHin
   });
 
   return {
-    setTools,
+    resume() {
+      if (call(`(buffer-exists? ${url})`) !== "#t") {
+        throw new Error("Open the manuscript again from your library.");
+      }
+      call(`(switch-to-buffer* ${url})`);
+      iframe.focus();
+    },
     room() {
       call(installRoom);
       call(`(tessera-start ${url})`);
@@ -172,10 +178,5 @@ export async function mountEditor(host, draft, signal, { onShortcut, shortcutHin
     },
     exportFile,
     source: () => call('(get-init "preamble")') === "true",
-    toggleSource() {
-      requireManuscript();
-      call("(toggle-source-mode)");
-      return this.source();
-    },
   };
 }

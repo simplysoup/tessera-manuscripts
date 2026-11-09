@@ -22,6 +22,10 @@ The guides are editor overlays and leave document layout and export intact.
 Tessera owns the F2 command prefix, with direct toolbar bindings and a
 native key entry mode for chords that the browser reserves.
 
+The fourth patch styles the native menu bar for Tessera and gives the
+embedded File menu printing and additional native file formats.
+Tessera owns manuscript navigation, saving, sharing, and standard export.
+
 The full Upsilon web target retains its own storage, tabs, and plug-ins.
 Tessera's frontend owns document persistence. Native preferences in the
 embedded runtime are transient. The build still includes the C++ editor,
@@ -33,8 +37,8 @@ binary or changing how the editor renders.
 
 Use the Upsilon source revision
 [`f531d91ea039b67fc405c9eb771b9e54cdfad9b7`](https://github.com/mgubi/texmacs/tree/f531d91ea039b67fc405c9eb771b9e54cdfad9b7).
-This is the source baseline for the patch, separate from the older WASM
-binary listed in [PORT.md](../docs/PORT.md).
+This is the source baseline for the browser engine described in
+[PORT.md](../docs/PORT.md).
 
 From the Upsilon checkout, with `TESSERA_REPO` pointing to this repository:
 
