@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f5ef">
+  <title>Tessera — Manuscript studio</title>
+  <meta name="description" content="A workspace for scientific writing, math, and manuscripts.">
+  <link rel="icon" href="/app/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/app/style.css">
+  <script type="module" src="/app/workspace.js"></script>
+</head>
+<body>
+  <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="logo" viewBox="0 0 24 24"><path d="M12 2 22 7.5 12 13 2 7.5 12 2ZM2 12l10 5.5L22 12M2 16.5 12 22l10-5.5"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5"/></symbol>
+    <symbol id="arrow" viewBox="0 0 24 24"><path d="M4 12h15m-6-6 6 6-6 6"/></symbol>
+    <symbol id="back" viewBox="0 0 24 24"><path d="M20 12H5m6-6-6 6 6 6"/></symbol>
+    <symbol id="paper" viewBox="0 0 24 24"><path d="M5 3h9l5 5v13H5zM14 3v6h5M8 13h8m-8 4h6"/></symbol>
+    <symbol id="math" viewBox="0 0 24 24"><path d="M18 5H6l6 7-6 7h12M18 5v3m0 11v-3"/></symbol>
+    <symbol id="code" viewBox="0 0 24 24"><path d="m8 6-6 6 6 6m8-12 6 6-6 6m-2-14-4 16"/></symbol>
+    <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1 .7-1.5 1.4-1.5 2.5m0 3h.01"/></symbol>
+    <symbol id="edit" viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L20 8l-4-4L4 16Zm10-10 4 4"/></symbol>
+    <symbol id="trash" viewBox="0 0 24 24"><path d="M3 6h18m-14 0V3h10v3m2 0-1 15H6L5 6m5 4v7m4-7v7"/></symbol>
+  </svg>
+  <section id="library" class="library">
+    <header class="topbar">
+      <div class="top-inner">
+        <a class="brand" href="/" aria-label="Tessera home"><span class="brand-icon"><svg><use href="#logo"/></svg></span>Tessera</a>
+        <span class="top-divider"></span><span class="top-section">Manuscript studio</span>
+        <div class="top-actions"><span class="local-pill"><span></span> Local workspace</span><button class="icon-button" id="about" aria-label="Workspace help"><svg><use href="#help"/></svg></button></div>
+      </div>
+    </header>
+    <main class="main">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-content">
+          <div class="eyebrow hero-label"><span></span> THE WRITING ROOM</div>
+          <h1 id="hero-title">Space for<br>good ideas<span>.</span></h1>
+          <p>Write papers, play with equations, and make your thinking visible.</p>
+          <div class="hero-actions"><button class="button bright" id="new"><svg><use href="#plus"/></svg> New manuscript</button><button class="button ghost" id="import"><svg><use href="#upload"/></svg> Import a file</button></div>
+        </div>
+        <svg class="hero-art" viewBox="0 0 480 320" aria-hidden="true">
+          <defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0v24" fill="none" stroke="#bde4d5" stroke-opacity=".12"/></pattern><linearGradient id="art-fill"><stop stop-color="#2f6d5c"/><stop offset="1" stop-color="#204f49"/></linearGradient></defs>
+          <path fill="url(#grid)" d="M0 0h480v320H0z"/>
+          <g fill="none" stroke="#89c4ac" stroke-opacity=".58"><circle cx="273" cy="159" r="117"/><circle cx="273" cy="159" r="87" stroke-dasharray="2 6"/><path d="M82 159h356M273 12v294M159 45l228 228m0-228L159 273"/><ellipse cx="273" cy="159" rx="153" ry="50" transform="rotate(-29 273 159)"/></g>
+          <g stroke="#b3eaca" stroke-width="1.2" fill="url(#art-fill)"><path d="m273 70 77 45v89l-77 45-77-45v-89z"/><path d="m273 159 77-44m-77 44-77-44m77 44v90"/><path d="m273 70 30 104-107 30m154 0-107-30 30-104" fill="none" opacity=".54"/></g>
+          <g fill="#e0fa9a"><circle cx="273" cy="70" r="4"/><circle cx="350" cy="204" r="3"/><circle cx="196" cy="204" r="3"/><circle cx="273" cy="159" r="4"/><circle cx="417" cy="94" r="3"/><circle cx="115" cy="224" r="3"/></g>
+          <g fill="#a7cabd" font-size="10" font-family="monospace" letter-spacing="2"><text x="118" y="52">FIG. 01</text><text x="337" y="292">IDEA → FORM</text></g>
+        </svg>
+      </section>
+      <section class="section" aria-labelledby="templates-title">
+        <div class="section-head"><div><div class="eyebrow">01 / START HERE</div><h2 id="templates-title">Pick a starting point</h2></div></div>
+        <div class="templates">
+          <button class="template" data-template="blank"><span class="template-icon sage"><svg><use href="#paper"/></svg></span><span class="template-text"><strong>Blank manuscript</strong><span>A clean page for your next idea.</span></span><svg class="template-arrow"><use href="#arrow"/></svg></button>
+          <button class="template" data-template="math"><span class="template-icon lilac"><svg><use href="#math"/></svg></span><span class="template-text"><strong>Math playground</strong><span>Explore a theorem, fractions, and matrices.</span></span><svg class="template-arrow"><use href="#arrow"/></svg></button>
+          <button class="template" data-template="latex"><span class="template-icon apricot"><svg><use href="#code"/></svg></span><span class="template-text"><strong>LaTeX example</strong><span>See a .tex file become an editable page.</span></span><svg class="template-arrow"><use href="#arrow"/></svg></button>
+        </div>
+      </section>
+      <section class="section manuscripts" aria-labelledby="draft-title">
+        <div class="section-head"><div><div class="eyebrow">02 / YOUR WORK</div><h2 id="draft-title">Manuscripts <span id="count" class="count" hidden></span></h2></div><label class="search"><svg><use href="#search"/></svg><input id="filter" type="search" aria-label="Find a manuscript" placeholder="Find a manuscript…"></label></div>
+        <div id="drafts" class="drafts" aria-live="polite"></div>
+      </section>
+      <footer class="footer"><span>Made for thinking on paper.</span><span>Powered by TeXmacs Upsilon</span></footer>
+    </main>
+  </section>
+
+  <section id="studio" class="studio" hidden aria-label="Manuscript editor">
+    <header class="editor-header">
+      <div class="editor-left">
+        <button id="back" class="icon-button editor-back" aria-label="Back to manuscripts"><svg><use href="#back"/></svg></button>
+        <div class="editor-name"><div class="eyebrow">MANUSCRIPT STUDIO</div><button id="rename" class="title-button" disabled aria-label="Rename manuscript"><span id="title"></span><svg><use href="#edit"/></svg></button></div>
+      </div>
+      <div class="editor-actions">
+        <span id="save-status" class="save-status" role="status"><span></span><span>Opening editor</span></span>
+        <details id="inserts" class="exports"><summary class="button outline" aria-disabled="true"><svg><use href="#plus"/></svg> Insert <svg><use href="#down"/></svg></summary><div class="export-menu"><button data-insert="equation">Equation <span>ƒ(x)</span></button><button data-insert="section">Section <span>§</span></button><button data-insert="theorem">Theorem <span>∴</span></button></div></details>
+        <button id="tools" class="button outline" type="button" aria-pressed="false" disabled>Tools</button>
+        <button id="source-mode" class="button outline" type="button" aria-pressed="false" disabled><svg><use href="#code"/></svg><span>Source</span></button>
+        <button id="save" class="button outline" type="button" disabled>Save</button>
+        <details id="exports" class="exports"><summary class="button dark" aria-disabled="true">Export <svg><use href="#down"/></svg></summary><div class="export-menu"><button data-format="pdf">PDF <span>.pdf</span></button><button data-format="latex">LaTeX <span>.tex</span></button><button data-format="texmacs">TeXmacs <span>.tm</span></button></div></details>
+      </div>
+    </header>
+    <div id="editor-host" class="editor-host"></div>
+    <footer class="editor-footer"><span><span class="small-dot"></span> Local draft</span><span id="editor-hint">Your manuscript is stored in this browser.</span></footer>
+  </section>
+  <input type="file" id="file" accept=".tex,.tm" hidden>
+  <dialog id="dialog"><form method="dialog" id="dialog-form"><div class="eyebrow" id="dialog-label"></div><h2 id="dialog-title"></h2><p id="dialog-copy"></p><label id="name-field" hidden>Manuscript name<input id="name" maxlength="90" autocomplete="off"></label><div class="dialog-actions"><button class="button outline" value="cancel" type="submit" formnovalidate>Cancel</button><button class="button dark" id="dialog-confirm" value="confirm" type="submit">Done</button></div></form></dialog>
+  <div id="notice" class="notice" role="status" hidden></div>
+</body>
+</html>
