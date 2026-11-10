@@ -75,3 +75,79 @@ test("the live session transports local edits in both directions and replays for
   const rejoined = await peer();
   assert.deepEqual(rejoined.received.sort(), ["(compound left)", "(compound right)"]);
 });
+
+test("a local patch failure pauses sync instead of reconnecting forever", async t => {
+  const server = await startServer();
+  t.after(server.close);
+  const realFetch = globalThis.fetch;
+  let changesCalls = 0;
+  t.mock.method(globalThis, "fetch", (path, options) => {
+    if (String(path).includes("/changes")) changesCalls += 1;
+    return realFetch(new URL(path, server.url), {
+      ...options, headers: { Origin: server.url, ...options?.headers },
+    });
+  });
+  const id = await createLink("room", "Wedges", encoded);
+  const statuses = [];
+  let local = null;
+  let takeThrows = false;
+  const editor = { room: () => ({
+    take() {
+      if (takeThrows) throw new Error("cannot compound undo");
+      const patch = local; local = null; return patch;
+    },
+    pending: () => !!local,
+    accept: () => {},
+    restore: patch => { local = patch; },
+    receive: () => true,
+    stop: () => {},
+  }) };
+  const controller = new AbortController();
+  const session = connectRoom(id, editor, message => statuses.push(message), controller.signal);
+  t.after(() => { controller.abort(); session.stop(); });
+  await session.start();
+  assert.deepEqual(statuses, ["Synced"]);
+  // A local edit the editor cannot turn into a patch (like a wedged undo)
+  // must pause sync once, not loop on Reconnecting every poll.
+  local = "(compound wedged)";
+  takeThrows = true;
+  await assert.rejects(session.flush(), /could not process a change: cannot compound undo/);
+  assert.ok(statuses.includes("Sync paused"), "expected Sync paused, got " + JSON.stringify(statuses));
+  assert.ok(!statuses.includes("Reconnecting"), "must not reconnect, got " + JSON.stringify(statuses));
+  const callsAtPause = changesCalls;
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  assert.equal(changesCalls, callsAtPause, "polling must stop after the pause");
+});
+
+test("a remote patch the editor cannot apply pauses sync", async t => {
+  const server = await startServer();
+  t.after(server.close);
+  const realFetch = globalThis.fetch;
+  t.mock.method(globalThis, "fetch", (path, options) => realFetch(new URL(path, server.url), {
+    ...options, headers: { Origin: server.url, ...options?.headers },
+  }));
+  const id = await createLink("room", "Remote wedge", encoded);
+  async function peer(receive) {
+    let local;
+    const editor = { room: () => ({
+      take() { const patch = local; local = null; return patch; },
+      pending: () => !!local,
+      accept: () => {},
+      restore: patch => { local = patch; },
+      receive,
+      stop: () => {},
+    }) };
+    const controller = new AbortController();
+    const statuses = [];
+    const session = connectRoom(id, editor, message => statuses.push(message), controller.signal);
+    t.after(() => { controller.abort(); session.stop(); });
+    await session.start();
+    return { session, statuses, edit: patch => { local = patch; } };
+  }
+  const left = await peer(() => { throw new Error("cannot apply remote"); });
+  const right = await peer(() => true);
+  right.edit("(compound remote)");
+  await right.session.flush();
+  await assert.rejects(left.session.flush(), /could not process a change: cannot apply remote/);
+  assert.ok(left.statuses.includes("Sync paused"), "expected Sync paused, got " + JSON.stringify(left.statuses));
+});
