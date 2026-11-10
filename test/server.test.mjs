@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { request as httpRequest } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import test from "node:test";
 
-export async function startServer() {
+export async function startServer(extraEnv = {}) {
   const server = spawn(process.execPath, [new URL("../scripts/serve.mjs", import.meta.url).pathname], {
-    env: { ...process.env, PORT: "0" }, stdio: ["ignore", "pipe", "inherit"],
+    env: { ...process.env, PORT: "0", ...extraEnv }, stdio: ["ignore", "pipe", "inherit"],
   });
   const [chunk] = await Promise.race([
     once(server.stdout, "data"),
@@ -63,5 +66,49 @@ if (process.env.NODE_TEST_CONTEXT) {
     assert.equal(await post({ Origin: "https://example.com" }), 403);
     // Behind a proxy, X-Forwarded-Proto: https makes the https origin pass.
     assert.notEqual(await post({ Origin: server.url.replace(/^http:/u, "https:"), "X-Forwarded-Proto": "https" }), 403);
+  });
+
+  test("demo accounts register, sign in and persist to a file database", async t => {
+    const dir = await mkdtemp(join(tmpdir(), "tessera-demo-"));
+    t.after(() => rm(dir, { recursive: true, force: true }));
+    const env = { DEMO_INVITE_CODE: "demo-invite-code", TESSERA_DB_PATH: join(dir, "tessera.db") };
+    const manuscript = await readFile(new URL("../web/examples/nested-derivation.tm", import.meta.url), "utf8");
+    // fetch() sends no Origin header, and the worker requires one for
+    // state-changing calls, so use raw requests here like a browser would.
+    const call = (server, method, path, body, headers = {}) => new Promise((resolve, reject) => {
+      const url = new URL(server.url + path);
+      const data = body === undefined ? undefined : JSON.stringify(body);
+      const req = httpRequest({ method, hostname: url.hostname, port: url.port, path: url.pathname, headers: { Origin: server.url, ...(data === undefined ? {} : { "Content-Type": "application/json" }), ...headers } }, res => {
+        let text = "";
+        res.on("data", chunk => { text += chunk; });
+        res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, json: () => JSON.parse(text) }));
+      });
+      req.on("error", reject);
+      req.end(data);
+    });
+    const server = await startServer(env);
+    t.after(server.close);
+    assert.equal((await fetch(server.url + "/api/me")).status, 401);
+    assert.equal((await call(server, "POST", "/api/auth/register", { email: "demo@example.com", password: "twelve-chars!", invite: "wrong" })).status, 403);
+    const registered = await call(server, "POST", "/api/auth/register", { email: "demo@example.com", password: "twelve-chars!", invite: "demo-invite-code" });
+    assert.equal(registered.status, 200);
+    assert.equal(registered.json().recoveryCodes.length, 10);
+    const session = registered.headers["set-cookie"]?.[0]?.split(";")[0];
+    assert.ok((session ?? "").includes("tessera_session="));
+    const created = await call(server, "POST", "/api/library", { id: "11111111-2222-3333-4444-555555555555", title: "demo", manuscript }, { Cookie: session });
+    assert.equal(created.status, 201);
+    // Restart: the account and manuscript survive in the file database.
+    server.close();
+    const restarted = await startServer(env);
+    t.after(restarted.close);
+    const library = await call(restarted, "GET", "/api/library", undefined, { Cookie: session });
+    assert.equal(library.status, 200);
+    assert.equal(library.json().length, 1);
+    // A saved edit round-trips through PUT, which needs the request body forwarded.
+    const updated = await call(restarted, "PUT", "/api/library/11111111-2222-3333-4444-555555555555", { id: "11111111-2222-3333-4444-555555555555", title: "demo edited", manuscript }, { Cookie: session });
+    assert.equal(updated.status, 200);
+    const fetched = await call(restarted, "GET", "/api/library/11111111-2222-3333-4444-555555555555", undefined, { Cookie: session });
+    assert.equal(fetched.status, 200);
+    assert.equal(fetched.json().title, "demo edited");
   });
 }

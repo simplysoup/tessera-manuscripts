@@ -19,6 +19,19 @@ drafts, or use **New manuscript** or a sample to explore. The local server uses
 an in-memory database and a development identity; it needs no account or
 secrets. Stop it with `Ctrl+C`.
 
+## Run a persistent demo server
+
+To run the demo accounts from [Account storage](docs/ACCOUNT-STORAGE.md)
+instead of the fixed development identity, set a database file and the shared
+invite code before starting:
+
+```sh
+TESSERA_DB_PATH=/path/to/tessera.db DEMO_INVITE_CODE=<shared secret> npm start
+```
+
+Registration then requires the invite code, and accounts and manuscripts persist
+in the SQLite file across restarts. Keep the invite code out of the repository.
+
 ## Verify and build
 
 ```sh

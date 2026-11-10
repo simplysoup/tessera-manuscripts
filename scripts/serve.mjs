@@ -4,7 +4,7 @@ import { Readable } from "node:stream";
 import { DatabaseSync } from "node:sqlite";
 import worker from "../worker/index.js";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { parseArgs } from "node:util";
@@ -42,20 +42,64 @@ const types = {
 };
 const downloads = new Map();
 
-const sqlite = new DatabaseSync(":memory:");
+// TESSERA_DB_PATH points at a SQLite file for a persistent deployment.
+// Without it the server keeps the previous behaviour: an in-memory database
+// that is empty on every start. Applied migrations are recorded, so a file
+// database survives restarts without re-running them.
+const dbPath = process.env.TESSERA_DB_PATH ?? ":memory:";
+if (dbPath !== ":memory:") await mkdir(dirname(dbPath), { recursive: true });
+const sqlite = new DatabaseSync(dbPath);
+sqlite.exec("CREATE TABLE IF NOT EXISTS tessera_migrations (name TEXT PRIMARY KEY, applied INTEGER NOT NULL)");
 for (const migration of ["0000_manuscript_links.sql", "0001_account_manuscripts.sql", "0002_demo_accounts.sql", "0003_recovery_privacy_limits.sql"]) {
+  if (sqlite.prepare("SELECT 1 FROM tessera_migrations WHERE name = ?").get(migration)) continue;
   sqlite.exec(await readFile(join(root, "drizzle", migration), "utf8"));
+  sqlite.prepare("INSERT INTO tessera_migrations (name, applied) VALUES (?, ?)").run(migration, Date.now());
 }
 const DB = {
+  // D1-compatible: the prepared object itself has run/first/all (no
+  // parameters), and bind() returns the same methods with parameters
+  // baked in. The worker uses both forms.
   prepare(sql) {
     const statement = sqlite.prepare(sql);
-    return { bind: (...parameters) => ({
+    const bound = (...parameters) => ({
       run: async () => statement.run(...parameters),
       first: async () => statement.get(...parameters),
       all: async () => ({ results: statement.all(...parameters) }),
-    }) };
+      // D1-compatible batch execution: RETURNING statements return their
+      // rows, other writes report their change count.
+      execute() {
+        if (/RETURNING/iu.test(sql)) {
+          const rows = statement.all(...parameters);
+          return { results: rows, meta: { changes: rows.length } };
+        }
+        const { changes } = statement.run(...parameters);
+        return { results: [], meta: { changes } };
+      },
+    });
+    return { bind: (...parameters) => bound(...parameters), ...bound() };
+  },
+  // The worker uses db.batch for recovery-code rotation, password recovery
+  // and share-link revocation. Run the statements in one transaction and
+  // return D1-shaped results.
+  async batch(statements) {
+    sqlite.exec("BEGIN");
+    try {
+      const results = statements.map(statement => statement.execute());
+      sqlite.exec("COMMIT");
+      return results;
+    } catch (error) {
+      sqlite.exec("ROLLBACK");
+      throw error;
+    }
   },
 };
+
+// With DEMO_INVITE_CODE set, the server runs the demo accounts from the docs:
+// registration needs the invite code and there is no fixed dev identity.
+// Without it, local start keeps the fixed local-only identity.
+const workerEnv = { DB };
+if (process.env.DEMO_INVITE_CODE) workerEnv.DEMO_INVITE_CODE = process.env.DEMO_INVITE_CODE;
+else workerEnv.DEV_USER = "local-development-user";
 
 function verifyFont(file, bytes) {
   const digest = /^tm-font-([a-f0-9]{12})\./u.exec(file)?.[1];
@@ -150,10 +194,13 @@ const server = createServer(async (request, response) => {
     const proto = request.headers["x-forwarded-proto"] === "https" ? "https" : "http";
     const url = new URL(request.url, proto + "://" + request.headers.host);
     const path = decodeURIComponent(url.pathname);
-    if (path === "/api/me" || path === "/api/library" || path.startsWith("/api/library/") || path.startsWith("/api/manuscripts/")) {
+    if (path === "/api/me" || path === "/api/library" || path.startsWith("/api/library/") ||
+        path.startsWith("/api/manuscripts/") || path.startsWith("/api/auth/") || path.startsWith("/api/account/")) {
       const options = { method: request.method, headers: request.headers };
-      if (request.method === "POST") Object.assign(options, { body: Readable.toWeb(request), duplex: "half" });
-      const result = await worker.fetch(new Request(url, options), { DB, DEV_USER: "local-development-user" });
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        Object.assign(options, { body: Readable.toWeb(request), duplex: "half" });
+      }
+      const result = await worker.fetch(new Request(url, options), workerEnv);
       response.writeHead(result.status, Object.fromEntries(result.headers));
       response.end(Buffer.from(await result.arrayBuffer()));
       return;
