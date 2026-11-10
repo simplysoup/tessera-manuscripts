@@ -44,7 +44,7 @@ test("the live session transports local edits in both directions and replays for
     ...options, headers: { Origin: server.url, ...options?.headers },
   }));
   const id = await createLink("room", "Two editors", encoded);
-  assert.deepEqual(await readLink("room", id), { title: "Two editors", format: "tm", bytes: encoded });
+  assert.deepEqual(await readLink("room", id), { title: "Two editors", format: "tm", bytes: encoded, snapshotRevision: 0 });
 
   async function peer() {
     let local;
@@ -74,6 +74,129 @@ test("the live session transports local edits in both directions and replays for
   assert.deepEqual(right.received, ["(compound left)"]);
   const rejoined = await peer();
   assert.deepEqual(rejoined.received.sort(), ["(compound left)", "(compound right)"]);
+});
+
+test("room snapshots are validated and only move the checkpoint forward", async t => {
+  const server = await startServer();
+  t.after(server.close);
+  const send = (path, body, origin = server.url) => fetch(server.url + "/api/manuscripts/" + path, {
+    method: "POST", headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  const read = path => fetch(server.url + "/api/manuscripts/" + path);
+  const document = { title: "Snapshot rules", manuscript };
+  const room = (await (await send("room", document)).json()).id;
+  const snapshot = "room/" + room + "/snapshot";
+  assert.equal((await send("room/" + crypto.randomUUID() + "/snapshot", { revision: 0, manuscript })).status, 404);
+  assert.equal((await send(snapshot, { revision: 0, manuscript: "not texmacs" })).status, 400);
+  assert.equal((await send(snapshot, { revision: -1, manuscript })).status, 400);
+  // A snapshot cannot cover a revision the room does not hold yet.
+  assert.equal((await send(snapshot, { revision: 1, manuscript })).status, 409);
+  const changes = "room/" + room + "/changes";
+  assert.equal((await send(changes, { id: crypto.randomUUID(), revision: 0, patch: "(compound one)" })).status, 201);
+  assert.deepEqual(await (await send(snapshot, { revision: 1, manuscript })).json(), { snapshot_revision: 1 });
+  assert.equal((await (await read("room/" + room)).json()).snapshot_revision, 1);
+  // The checkpoint cannot move backwards or stay put.
+  assert.equal((await send(snapshot, { revision: 1, manuscript })).status, 409);
+  assert.equal((await send(snapshot, { revision: 0, manuscript })).status, 409);
+  // A snapshot from another origin is refused, like other room writes.
+  assert.equal((await send(snapshot, { revision: 1, manuscript }, "https://elsewhere.example")).status, 403);
+  // A copy link has no snapshot endpoint.
+  const copy = (await (await send("copy", document)).json()).id;
+  assert.equal((await send("copy/" + copy + "/snapshot", { revision: 0, manuscript })).status, 404);
+});
+
+test("a snapshot checkpoints the room so a new session replays only the tail", async t => {
+  const server = await startServer();
+  t.after(server.close);
+  const realFetch = globalThis.fetch;
+  t.mock.method(globalThis, "fetch", (path, options) => realFetch(new URL(path, server.url), {
+    ...options, headers: { Origin: server.url, ...options?.headers },
+  }));
+  const id = await createLink("room", "Checkpointed", encoded);
+  assert.deepEqual(await readLink("room", id), { title: "Checkpointed", format: "tm", bytes: encoded, snapshotRevision: 0 });
+
+  async function peer() {
+    // The app reads the link first and joins from its checkpoint.
+    const { snapshotRevision } = await readLink("room", id);
+    let local;
+    const received = [];
+    const editor = {
+      exportFile: () => encoded,
+      room: () => ({
+        take() { const patch = local; local = null; return patch; },
+        pending: () => !!local,
+        accept: () => {},
+        restore: patch => { local = patch; },
+        receive: patch => { received.push(patch); return true; },
+        stop: () => {},
+      }),
+    };
+    const controller = new AbortController();
+    const session = connectRoom(id, editor, () => {}, controller.signal, snapshotRevision);
+    t.after(() => { controller.abort(); session.stop(); });
+    await session.start();
+    return { session, received, edit: patch => { local = patch; } };
+  }
+
+  const writer = await peer();
+  writer.edit("(compound one)");
+  await writer.session.flush();
+  writer.edit("(compound two)");
+  await writer.session.flush();
+  assert.equal(await writer.session.snapshot(), true);
+  assert.equal((await readLink("room", id)).snapshotRevision, 2);
+  // A client joining now starts from the checkpoint and replays nothing.
+  const joined = await peer();
+  assert.deepEqual(joined.received, []);
+  // A change after the checkpoint is still delivered, and only the tail.
+  writer.edit("(compound three)");
+  await writer.session.flush();
+  const late = await peer();
+  assert.deepEqual(late.received, ["(compound three)"]);
+});
+
+test("a snapshot past an unappliable patch lets a new session open cleanly", async t => {
+  const server = await startServer();
+  t.after(server.close);
+  const realFetch = globalThis.fetch;
+  t.mock.method(globalThis, "fetch", (path, options) => realFetch(new URL(path, server.url), {
+    ...options, headers: { Origin: server.url, ...options?.headers },
+  }));
+  const id = await createLink("room", "Healed by checkpoint", encoded);
+  async function peer(receive) {
+    const { snapshotRevision } = await readLink("room", id);
+    let local;
+    const received = [];
+    const editor = {
+      exportFile: () => encoded,
+      room: () => ({
+        take() { const patch = local; local = null; return patch; },
+        pending: () => !!local,
+        accept: () => {},
+        restore: patch => { local = patch; },
+        receive: patch => { received.push(patch); return receive(patch); },
+        stop: () => {},
+      }),
+    };
+    const controller = new AbortController();
+    const statuses = [];
+    const session = connectRoom(id, editor, message => statuses.push(message), controller.signal, snapshotRevision);
+    t.after(() => { controller.abort(); session.stop(); });
+    return { session, statuses, received, edit: patch => { local = patch; } };
+  }
+  const writer = await peer(() => true);
+  await writer.session.start();
+  writer.edit("(compound structural)");
+  await writer.session.flush();
+  // The writer checkpoints past its own patch, absorbing it into the
+  // stored manuscript, so a client that cannot apply the patch never
+  // has to replay it.
+  assert.equal(await writer.session.snapshot(), true);
+  const reader = await peer(() => { throw new Error("cannot apply remote"); });
+  await reader.session.start();
+  assert.ok(reader.statuses.includes("Synced"), "expected Synced, got " + JSON.stringify(reader.statuses));
+  assert.ok(!reader.statuses.includes("Sync paused"), "must not pause, got " + JSON.stringify(reader.statuses));
+  assert.deepEqual(reader.received, []);
 });
 
 test("a local patch failure pauses sync instead of reconnecting forever", async t => {

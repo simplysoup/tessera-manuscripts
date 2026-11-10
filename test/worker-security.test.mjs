@@ -25,7 +25,7 @@ class Statement {
 async function fixture(t) {
   const sqlite = new DatabaseSync(":memory:");
   sqlite.exec("PRAGMA foreign_keys=ON");
-  for (const name of ["0000_manuscript_links.sql", "0001_account_manuscripts.sql", "0002_demo_accounts.sql", "0003_recovery_privacy_limits.sql"]) {
+  for (const name of ["0000_manuscript_links.sql", "0001_account_manuscripts.sql", "0002_demo_accounts.sql", "0003_recovery_privacy_limits.sql", "0004_room_snapshot.sql"]) {
     const sql = await readFile(new URL("../drizzle/" + name, import.meta.url), "utf8");
     for (const statement of sql.split("--> statement-breakpoint")) if (statement.trim()) sqlite.exec(statement);
   }

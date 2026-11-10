@@ -224,7 +224,7 @@ async function openDraft(id, shared, { replaceId } = {}) {
         if (state !== session) return;
         status(message, kind);
         if (message === "Sync paused") $("editor-hint").textContent = error.message + " Your local edits are still here. Use Export to keep a copy.";
-      }, session.controller.signal);
+      }, session.controller.signal, draft.snapshotRevision ?? 0);
       await session.room.start();
       if (state !== session) return;
       await documents.replace(replaceId ?? local?.id, {

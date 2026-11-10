@@ -402,8 +402,44 @@ async function links(request, url, db) {
   }
 
   if (id && action === undefined && method === "GET") {
-    const row = await db.prepare("SELECT title, manuscript FROM manuscript_links WHERE id = ? AND kind = ?").bind(id, kind).first();
-    return row ? json(row) : json({ error: "This manuscript link is unavailable." }, 404);
+    const row = await db.prepare("SELECT title, manuscript, snapshot_revision FROM manuscript_links WHERE id = ? AND kind = ?").bind(id, kind).first();
+    if (!row) return json({ error: "This manuscript link is unavailable." }, 404);
+    // A room reports the revision its stored manuscript covers, so a
+    // joining client starts from that checkpoint instead of replaying the
+    // whole change log. A copy link is an immutable snapshot with no
+    // revision, so its shape stays exactly as it was.
+    return json(kind === "room"
+      ? { title: row.title, manuscript: row.manuscript, snapshot_revision: row.snapshot_revision }
+      : { title: row.title, manuscript: row.manuscript });
+  }
+
+  if (id && kind === "room" && action === "snapshot") {
+    if (method !== "POST") return json({ error: "Method not allowed." }, 405);
+    const value = await payload(request);
+    if (!value || !Number.isSafeInteger(value.revision) || value.revision < 0 ||
+        !small(value.manuscript) || !value.manuscript.startsWith("<TeXmacs|")) {
+      return json({ error: "Invalid manuscript snapshot." }, 400);
+    }
+    // A snapshot checkpoints the room: the stored manuscript becomes the
+    // document at this revision, so a joining client fetches the checkpoint
+    // plus only the changes after it instead of replaying from revision 0.
+    // It must cover a revision the server already holds, and must move the
+    // checkpoint strictly forward, so a stale client cannot roll the room
+    // back. The check and the write are one statement, so they are atomic.
+    // The change log is left untouched: a client still connected keeps
+    // polling it normally, and the checkpoint only changes what a client
+    // joining (or reopening) starts from.
+    const saved = await db.prepare(`
+      UPDATE manuscript_links SET manuscript = ?, snapshot_revision = ?
+      WHERE id = ? AND kind = 'room'
+        AND snapshot_revision < ?
+        AND ? <= COALESCE((SELECT MAX(revision) FROM room_changes WHERE room_id = ?), 0)
+      RETURNING snapshot_revision
+    `).bind(value.manuscript, value.revision, id, value.revision, value.revision, id).first();
+    if (saved) return json({ snapshot_revision: saved.snapshot_revision });
+    const room = await db.prepare("SELECT id FROM manuscript_links WHERE id = ? AND kind = 'room'").bind(id).first();
+    if (!room) return json({ error: "This shared manuscript is unavailable." }, 404);
+    return json({ error: "The snapshot does not cover a revision this room holds." }, 409);
   }
 
   if (id && kind === "room" && action === "changes") {
@@ -488,7 +524,10 @@ export default {
       return json({ error: "Open Tessera to update a manuscript." }, 403);
     }
     try {
-      if (request.method === "POST" && !url.pathname.endsWith("/changes")) {
+      // Creating a link needs a signed-in owner, but posting a change or a
+      // snapshot is bearer access for anyone holding the room link, like
+      // the changes endpoint, so those two pass through untouched.
+      if (request.method === "POST" && !url.pathname.endsWith("/changes") && !url.pathname.endsWith("/snapshot")) {
         const user = await identity(request, env);
         if (!user) return json({ error: "Sign in to share a manuscript." }, 401);
         const original = request.clone();

@@ -50,7 +50,7 @@ const dbPath = process.env.TESSERA_DB_PATH ?? ":memory:";
 if (dbPath !== ":memory:") await mkdir(dirname(dbPath), { recursive: true });
 const sqlite = new DatabaseSync(dbPath);
 sqlite.exec("CREATE TABLE IF NOT EXISTS tessera_migrations (name TEXT PRIMARY KEY, applied INTEGER NOT NULL)");
-for (const migration of ["0000_manuscript_links.sql", "0001_account_manuscripts.sql", "0002_demo_accounts.sql", "0003_recovery_privacy_limits.sql"]) {
+for (const migration of ["0000_manuscript_links.sql", "0001_account_manuscripts.sql", "0002_demo_accounts.sql", "0003_recovery_privacy_limits.sql", "0004_room_snapshot.sql"]) {
   if (sqlite.prepare("SELECT 1 FROM tessera_migrations WHERE name = ?").get(migration)) continue;
   sqlite.exec(await readFile(join(root, "drizzle", migration), "utf8"));
   sqlite.prepare("INSERT INTO tessera_migrations (name, applied) VALUES (?, ?)").run(migration, Date.now());

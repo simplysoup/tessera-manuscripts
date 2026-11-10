@@ -26,7 +26,9 @@ export async function createLink(kind, title, bytes) {
 
 export async function readLink(kind, id, signal) {
   const value = await request(kind + "/" + id, undefined, signal);
-  return { title: value.title, format: "tm", bytes: encoder.encode(value.manuscript) };
+  // A room reports the revision its stored manuscript covers; a copy link
+  // has no revision, so it reads as 0.
+  return { title: value.title, format: "tm", bytes: encoder.encode(value.manuscript), snapshotRevision: value.snapshot_revision ?? 0 };
 }
 
 export function linkUrl(kind, id) {
@@ -35,9 +37,15 @@ export function linkUrl(kind, id) {
   return url.href;
 }
 
-export function connectRoom(id, editor, onStatus, signal) {
+export function connectRoom(id, editor, onStatus, signal, startRevision = 0) {
   const path = "room/" + id + "/changes";
-  let revision = 0;
+  // A joining client starts from the server's checkpoint instead of
+  // revision 0, so it fetches only the changes after the checkpoint and
+  // never replays a patch the checkpoint already absorbed.
+  let revision = startRevision;
+  // The revision the server's stored manuscript covers. A snapshot upload
+  // advances it; the change log itself is untouched.
+  let snapshotRevision = startRevision;
   let outgoing;
   let running;
   let conflict;
@@ -45,7 +53,34 @@ export function connectRoom(id, editor, onStatus, signal) {
   let timer;
   let backoff = 0;
   let last409Revision = -1;
+  let snapshotting = false;
   const native = editor.room();
+  // A synced client checkpoints the room this many revisions past the last
+  // checkpoint, so a client joining later starts from a recent document.
+  const snapshotGap = 25;
+
+  // Upload a checkpoint of the current document. Best effort: a snapshot
+  // that is rejected (another client checkpointed further, or the document
+  // is too large) just leaves the room on its previous checkpoint, and the
+  // change log still replays. Only a synced client snapshots, so the
+  // document it exports is exactly the document at the revision it sends.
+  async function snapshot() {
+    if (stopped || conflict || snapshotting || revision <= snapshotRevision) return false;
+    if (typeof editor.exportFile !== "function") return false;
+    snapshotting = true;
+    try {
+      const at = revision;
+      const manuscript = new TextDecoder().decode(editor.exportFile("texmacs"));
+      if (!manuscript.startsWith("<TeXmacs|") || encoder.encode(manuscript).length > 512 * 1024) return false;
+      const receipt = await request("room/" + id + "/snapshot", { revision: at, manuscript }, signal);
+      snapshotRevision = receipt.snapshot_revision;
+      return true;
+    } catch {
+      return false;
+    } finally {
+      snapshotting = false;
+    }
+  }
 
   function pending() {
     return Boolean(outgoing || native.pending() || conflict);
@@ -114,6 +149,7 @@ export function connectRoom(id, editor, onStatus, signal) {
     if (stopped) return Promise.resolve();
     if (!running) running = update().then(() => {
       backoff = 0;
+      if (revision - snapshotRevision >= snapshotGap) snapshot();
     }).catch(error => {
       if (!stopped && !signal.aborted) {
         // A bad patch, a missing room, or a signed-out session cannot be
@@ -159,6 +195,7 @@ export function connectRoom(id, editor, onStatus, signal) {
       await sync();
       while (pending()) await sync();
     },
+    snapshot,
     pending,
     stop() {
       stopped = true;
