@@ -151,3 +151,76 @@ test("a remote patch the editor cannot apply pauses sync", async t => {
   await assert.rejects(left.session.flush(), /could not process a change: cannot apply remote/);
   assert.ok(left.statuses.includes("Sync paused"), "expected Sync paused, got " + JSON.stringify(left.statuses));
 });
+
+test("a room whose opening replay hits an unappliable patch still opens, paused", async t => {
+  const server = await startServer();
+  t.after(server.close);
+  const realFetch = globalThis.fetch;
+  t.mock.method(globalThis, "fetch", (path, options) => realFetch(new URL(path, server.url), {
+    ...options, headers: { Origin: server.url, ...options?.headers },
+  }));
+  const id = await createLink("room", "Diverged replay", encoded);
+  async function peer(receive) {
+    let local;
+    const editor = { room: () => ({
+      take() { const patch = local; local = null; return patch; },
+      pending: () => !!local,
+      accept: () => {},
+      restore: patch => { local = patch; },
+      receive,
+      stop: () => {},
+    }) };
+    const controller = new AbortController();
+    const statuses = [];
+    const session = connectRoom(id, editor, message => statuses.push(message), controller.signal);
+    t.after(() => { controller.abort(); session.stop(); });
+    return { session, statuses, edit: patch => { local = patch; } };
+  }
+  const writer = await peer(() => true);
+  await writer.session.start();
+  writer.edit("(compound writer)");
+  await writer.session.flush();
+  // The reader cannot apply the writer's patch (as a structural patch can
+  // fail to apply on replay). Opening must still succeed, paused at the
+  // last good revision, instead of failing the open outright.
+  const reader = await peer(() => { throw new Error("cannot apply remote"); });
+  await reader.session.start();
+  assert.ok(reader.statuses.includes("Sync paused"), "expected Sync paused, got " + JSON.stringify(reader.statuses));
+  assert.ok(!reader.statuses.includes("Reconnecting"), "must not reconnect, got " + JSON.stringify(reader.statuses));
+  await assert.rejects(reader.session.flush(), /could not process a change: cannot apply remote/);
+});
+
+test("a patch the room keeps rejecting pauses instead of looping", async t => {
+  const server = await startServer();
+  t.after(server.close);
+  const realFetch = globalThis.fetch;
+  t.mock.method(globalThis, "fetch", (path, options) => {
+    if (String(path).includes("/changes") && options?.method === "POST") {
+      return Promise.resolve(new Response(JSON.stringify({ error: "The room has advanced." }), {
+        status: 409, headers: { "Content-Type": "application/json" },
+      }));
+    }
+    return realFetch(new URL(path, server.url), {
+      ...options, headers: { Origin: server.url, ...options?.headers },
+    });
+  });
+  const id = await createLink("room", "Stale patch", encoded);
+  const statuses = [];
+  let local = "(compound stale)";
+  const editor = { room: () => ({
+    take() { const patch = local; local = null; return patch; },
+    pending: () => !!local,
+    accept: () => {},
+    restore: patch => { local = patch; },
+    receive: () => true,
+    stop: () => {},
+  }) };
+  const controller = new AbortController();
+  const session = connectRoom(id, editor, message => statuses.push(message), controller.signal);
+  t.after(() => { controller.abort(); session.stop(); });
+  // The room rejects the patch and never advances, so the second rejection
+  // must pause sync instead of retrying the same patch forever.
+  await session.start();
+  assert.ok(statuses.includes("Sync paused"), "expected Sync paused, got " + JSON.stringify(statuses));
+  assert.ok(!statuses.includes("Reconnecting"), "must not reconnect, got " + JSON.stringify(statuses));
+});

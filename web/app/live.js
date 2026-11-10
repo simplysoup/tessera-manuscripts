@@ -44,6 +44,7 @@ export function connectRoom(id, editor, onStatus, signal) {
   let stopped = false;
   let timer;
   let backoff = 0;
+  let last409Revision = -1;
   const native = editor.room();
 
   function pending() {
@@ -79,6 +80,15 @@ export function connectRoom(id, editor, onStatus, signal) {
         } catch (error) {
           if (error.status !== 409) throw error;
           localCall(() => native.restore(outgoing.patch));
+          // If the room has not advanced since the last rejection, this
+          // patch can never be accepted; pause instead of retrying it
+          // forever. (This is the state a client is left in when a
+          // revision it already holds is removed from the room.)
+          if (revision === last409Revision) {
+            conflict = new Error("The room has moved on from this version. Export your version to keep a copy, then reopen the room.");
+            throw conflict;
+          }
+          last409Revision = revision;
         }
         outgoing = undefined;
       }
@@ -131,7 +141,18 @@ export function connectRoom(id, editor, onStatus, signal) {
   }
   return {
     async start() {
-      await sync();
+      try {
+        await sync();
+      } catch (error) {
+        // If the opening replay hit a patch this editor cannot apply,
+        // the room is diverged, not unreachable: open it at the last
+        // good revision (paused) so the work stays visible and
+        // exportable, instead of failing the open outright. A transport
+        // failure still rejects, so a room that cannot be reached at all
+        // does not open empty.
+        if (conflict) return;
+        throw error;
+      }
       timer = setTimeout(poll, 650);
     },
     async flush() {
