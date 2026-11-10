@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { request as httpRequest } from "node:http";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import test from "node:test";
@@ -41,5 +42,26 @@ if (process.env.NODE_TEST_CONTEXT) {
     assert.match(await (await get("/examples/nested-derivation.tm")).text(), /<frac\|x<rsup\|2>/u);
     assert.equal((await get("/%2e%2e%2fpackage.json")).status, 404);
     assert.equal((await get("/tm-font-000000000000.otf")).status, 404);
+  });
+
+  test("state-changing API calls accept the proxied https origin", async t => {
+    const server = await startServer();
+    t.after(server.close);
+    // fetch() forbids setting Origin, so use a raw request here.
+    const post = headers => new Promise((resolve, reject) => {
+      const url = new URL(server.url + "/api/library");
+      const req = httpRequest({ method: "POST", hostname: url.hostname, port: url.port, path: url.pathname, headers: { "Content-Type": "application/json", ...headers } }, res => {
+        res.resume();
+        res.on("end", () => resolve(res.statusCode));
+      });
+      req.on("error", reject);
+      req.end("{}");
+    });
+    // Same-origin POST passes the origin check (400: empty manuscript, not 403).
+    assert.notEqual(await post({ Origin: server.url }), 403);
+    // A foreign origin is still rejected.
+    assert.equal(await post({ Origin: "https://example.com" }), 403);
+    // Behind a proxy, X-Forwarded-Proto: https makes the https origin pass.
+    assert.notEqual(await post({ Origin: server.url.replace(/^http:/u, "https:"), "X-Forwarded-Proto": "https" }), 403);
   });
 }

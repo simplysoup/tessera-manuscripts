@@ -143,7 +143,12 @@ function respond(request, response, path, bytes) {
 
 const server = createServer(async (request, response) => {
   try {
-    const url = new URL(request.url, "http://" + request.headers.host);
+    // Behind Caddy the request is HTTPS, but Node only sees the plain HTTP
+    // connection. Caddy sets X-Forwarded-Proto, so honour it: the worker
+    // compares the browser Origin header against this URL origin, and it
+    // also decides the session cookie Secure flag from it.
+    const proto = request.headers["x-forwarded-proto"] === "https" ? "https" : "http";
+    const url = new URL(request.url, proto + "://" + request.headers.host);
     const path = decodeURIComponent(url.pathname);
     if (path === "/api/me" || path === "/api/library" || path.startsWith("/api/library/") || path.startsWith("/api/manuscripts/")) {
       const options = { method: request.method, headers: request.headers };
