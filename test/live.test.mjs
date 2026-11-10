@@ -199,6 +199,30 @@ test("a snapshot past an unappliable patch lets a new session open cleanly", asy
   assert.deepEqual(reader.received, []);
 });
 
+test("manuscripts larger than the patch limit can be shared and snapshotted, up to 10 MB", async t => {
+  const server = await startServer();
+  t.after(server.close);
+  const send = (path, body, origin = server.url) => fetch(server.url + "/api/manuscripts/" + path, {
+    method: "POST", headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+  // A single embedded image already exceeds the 512 KB patch limit, so a
+  // manuscript that size must still share and snapshot.
+  const large = "<TeXmacs|2.1.5>\n" + "x".repeat(600 * 1024);
+  const created = await send("room", { title: "Large manuscript", manuscript: large });
+  assert.equal(created.status, 201);
+  const room = (await created.json()).id;
+  assert.equal((await send("room/" + room + "/changes", { id: crypto.randomUUID(), revision: 0, patch: "(compound one)" })).status, 201);
+  const snapshot = await send("room/" + room + "/snapshot", { revision: 1, manuscript: large });
+  assert.equal(snapshot.status, 200);
+  assert.deepEqual(await snapshot.json(), { snapshot_revision: 1 });
+  // Over 10 MB is still refused.
+  const tooLarge = "<TeXmacs|2.1.5>\n" + "x".repeat(10 * 1024 * 1024 + 1);
+  assert.equal((await send("room", { title: "Too large", manuscript: tooLarge })).status, 400);
+  assert.equal((await send("room/" + room + "/snapshot", { revision: 1, manuscript: tooLarge })).status, 400);
+  // A patch over 512 KB is still refused, even though manuscripts are larger.
+  assert.equal((await send("room/" + room + "/changes", { id: crypto.randomUUID(), revision: 1, patch: "(" + "x".repeat(600 * 1024) })).status, 400);
+});
+
 test("a local patch failure pauses sync instead of reconnecting forever", async t => {
   const server = await startServer();
   t.after(server.close);

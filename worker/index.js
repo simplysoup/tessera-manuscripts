@@ -1,5 +1,11 @@
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
 const sizeLimit = 512 * 1024;
+// A manuscript is a whole document, and a single embedded image already
+// exceeds the patch limit (a 400 KB JPEG is ~530 KB once base64-encoded in
+// the .tm file), so manuscripts get their own, larger limit. Patches stay
+// at 512 KB. The JSON body cap leaves room for a manuscript plus its wrapper.
+const manuscriptLimit = 10 * 1024 * 1024;
+const bodyLimit = manuscriptLimit + 1024 * 1024;
 const sessionLifetime = 30 * 24 * 60 * 60 * 1000;
 // Cloudflare Workers caps Web Crypto PBKDF2 at 100,000 iterations.
 const passwordIterations = 100000;
@@ -20,7 +26,7 @@ async function payload(request) {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > 2 * sizeLimit) return null;
+      if (size > bodyLimit) return null;
       text += decoder.decode(value, { stream: true });
     }
     return JSON.parse(text + decoder.decode());
@@ -32,6 +38,7 @@ async function payload(request) {
 }
 
 const small = text => typeof text === "string" && new TextEncoder().encode(text).length <= sizeLimit;
+const manuscriptOk = text => typeof text === "string" && new TextEncoder().encode(text).length <= manuscriptLimit;
 
 function decodeBase64Url(value) {
   const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
@@ -302,7 +309,7 @@ async function library(request, url, db, user) {
   if (!id && request.method === "POST") {
     const value = await payload(request);
     if (!value || !uuid.test(value.id) || typeof value.title !== "string" || !value.title.trim() || value.title.length > 90 ||
-        !small(value.manuscript) || !value.manuscript.startsWith("<TeXmacs|")) return json({ error: "Invalid manuscript." }, 400);
+        !manuscriptOk(value.manuscript) || !value.manuscript.startsWith("<TeXmacs|")) return json({ error: "Invalid manuscript." }, 400);
     const count = await db.prepare("SELECT COUNT(*) AS count FROM user_manuscripts WHERE owner_id = ?").bind(user.sub).first();
     if (count.count >= 100) return json({ error: "Your account has reached its 100 manuscript limit." }, 429);
     const now = Date.now();
@@ -336,7 +343,7 @@ async function library(request, url, db, user) {
   if (request.method === "PUT") {
     const value = await payload(request);
     if (!value || typeof value.title !== "string" || !value.title.trim() || value.title.length > 90 ||
-        !small(value.manuscript) || !value.manuscript.startsWith("<TeXmacs|")) return json({ error: "Invalid manuscript." }, 400);
+        !manuscriptOk(value.manuscript) || !value.manuscript.startsWith("<TeXmacs|")) return json({ error: "Invalid manuscript." }, 400);
     const now = Date.now();
     const saved = await db.prepare(`UPDATE user_manuscripts SET title = ?, manuscript = ?, updated = ? WHERE id = ? AND owner_id = ? RETURNING id`)
       .bind(value.title.trim(), value.manuscript, now, id, user.sub).first();
@@ -385,8 +392,8 @@ async function links(request, url, db) {
   if (!id && method === "POST") {
     const value = await payload(request);
     if (!value || typeof value.title !== "string" || !value.title.trim() || value.title.length > 90 ||
-        !small(value.manuscript) || !value.manuscript.startsWith("<TeXmacs|")) {
-      return json({ error: "Choose a native manuscript under 512 KB to create a link." }, 400);
+        !manuscriptOk(value.manuscript) || !value.manuscript.startsWith("<TeXmacs|")) {
+      return json({ error: "Choose a native manuscript under 10 MB to create a link." }, 400);
     }
     const key = crypto.randomUUID();
     const day = new Date().toISOString().slice(0, 10);
@@ -417,7 +424,7 @@ async function links(request, url, db) {
     if (method !== "POST") return json({ error: "Method not allowed." }, 405);
     const value = await payload(request);
     if (!value || !Number.isSafeInteger(value.revision) || value.revision < 0 ||
-        !small(value.manuscript) || !value.manuscript.startsWith("<TeXmacs|")) {
+        !manuscriptOk(value.manuscript) || !value.manuscript.startsWith("<TeXmacs|")) {
       return json({ error: "Invalid manuscript snapshot." }, 400);
     }
     // A snapshot checkpoints the room: the stored manuscript becomes the

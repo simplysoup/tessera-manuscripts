@@ -71,7 +71,9 @@ export function connectRoom(id, editor, onStatus, signal, startRevision = 0) {
     try {
       const at = revision;
       const manuscript = new TextDecoder().decode(editor.exportFile("texmacs"));
-      if (!manuscript.startsWith("<TeXmacs|") || encoder.encode(manuscript).length > 512 * 1024) return false;
+      // A manuscript may carry embedded images, so its limit is 10 MB,
+      // not the 512 KB patch limit; a larger export simply never snapshots.
+      if (!manuscript.startsWith("<TeXmacs|") || encoder.encode(manuscript).length > 10 * 1024 * 1024) return false;
       const receipt = await request("room/" + id + "/snapshot", { revision: at, manuscript }, signal);
       snapshotRevision = receipt.snapshot_revision;
       return true;
