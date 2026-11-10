@@ -357,11 +357,86 @@ function syncView(editor) {
 }
 
 $("new").addEventListener("click", () => createDraft(templates.blank));
+async function loadAccountLinks() {
+  const target = $("account-links");
+  target.replaceChildren();
+  const links = await accountState.sharedLinks();
+  if (!links.length) {
+    const empty = document.createElement("p");
+    empty.className = "account-links-empty";
+    empty.textContent = "You have no active share links.";
+    target.append(empty);
+    return;
+  }
+  for (const link of links) {
+    const row = document.createElement("div");
+    row.className = "account-link-row";
+    const details = document.createElement("span");
+    const title = document.createElement("strong");
+    title.textContent = link.title;
+    const kind = document.createElement("small");
+    kind.textContent = link.kind === "room" ? "Shared editing room" : "Editable copy link";
+    details.append(title, kind);
+    const revoke = document.createElement("button");
+    revoke.type = "button";
+    revoke.className = "button outline";
+    revoke.textContent = "Revoke";
+    revoke.addEventListener("click", () => ask({
+      label: "SHARED LINK",
+      title: "Revoke this link?",
+      copy: "New visitors will lose access. A person who already made or downloaded a copy will keep that copy.",
+      confirm: "Revoke link",
+      action: async () => {
+        const active = state?.room && state.draft.roomId === link.id ? state : undefined;
+        if (active) await active.room.flush();
+        await accountState.revokeSharedLink(link.id);
+        if (active) returnToLibrary(active);
+        await loadAccountLinks();
+        notice("Share link revoked.");
+      },
+    }));
+    row.append(details, revoke);
+    target.append(row);
+  }
+}
+
 $("account").addEventListener("click", async () => {
+  const user = accountState.current();
+  if (user?.localOnly) {
+    try {
+      await accountState.logout();
+      $("library").hidden = true;
+      $("auth-screen").hidden = false;
+      setAuthMode("login");
+    } catch (error) { notice(error.message); }
+    return;
+  }
+  if (!user || user.local) return;
+  $("account-email").textContent = user.email;
+  try {
+    await loadAccountLinks();
+    $("account-dialog").showModal();
+  } catch (error) { notice(error.message); }
+});
+$("generate-recovery-codes").addEventListener("click", async () => {
+  const button = $("generate-recovery-codes");
+  const password = $("recovery-current-password").value;
+  if (!password) return notice("Enter your current password first.");
+  button.disabled = true;
+  try {
+    const result = await accountState.rotateRecoveryCodes(password);
+    $("recovery-current-password").value = "";
+    $("account-dialog").close();
+    showRecoveryCodes(result.recoveryCodes, () => $("account-dialog").showModal());
+  } catch (error) { notice(error.message); }
+  finally { button.disabled = false; }
+});
+$("account-sign-out").addEventListener("click", async () => {
   try {
     await accountState.logout();
     state = undefined;
     cache = [];
+    $("account-dialog").close();
     $("library").hidden = true;
     $("studio").hidden = true;
     $("auth-screen").hidden = false;
@@ -546,8 +621,8 @@ function showShare(session) {
   $("room-link-row").hidden = !session.room;
   $("room-link").value = session.room ? linkUrl("room", session.draft.roomId) : "";
   $("room-help").textContent = session.room
-    ? "Anyone who signs in and has this invitation link can edit the same manuscript."
-    : "This changes the manuscript from private to shared. Anyone who signs in and has this invitation link can edit it.";
+    ? "Anyone with this invitation link can edit this manuscript. Revoke it any time from Account."
+    : "This changes the manuscript from private to shared. Anyone with its invitation link can edit it.";
   $("start-room").textContent = "Share & collaborate";
   $("start-copy").hidden = false;
   $("start-copy").disabled = false;
@@ -599,7 +674,7 @@ $("start-copy").addEventListener("click", async () => {
     $("copy-link").value = linkUrl("copy", id);
     $("copy-link-row").hidden = false;
     $("start-copy").hidden = true;
-    $("copy-help").textContent = "Anyone who signs in and has this link can open a separate editable draft.";
+    $("copy-help").textContent = "Anyone with this link can open a separate editable draft. Revoke it any time from Account.";
   } catch (error) {
     $("copy-help").textContent = error.message;
   } finally {
@@ -687,20 +762,66 @@ let authMode = "login";
 function setAuthMode(mode) {
   authMode = mode;
   const registering = mode === "register";
+  const recovering = mode === "recover";
+  $("auth-tabs").hidden = recovering;
+  $("auth-recover").hidden = registering || recovering;
+  $("auth-back").hidden = !recovering;
   $("auth-login-tab").classList.toggle("selected", !registering);
   $("auth-register-tab").classList.toggle("selected", registering);
-  $("auth-title").innerHTML = registering ? "Join the demo<span>.</span>" : "Welcome back<span>.</span>";
+  $("auth-title").innerHTML = registering ? "Join the demo<span>.</span>" : recovering ? "Recover your account<span>.</span>" : "Welcome back<span>.</span>";
   $("auth-copy").textContent = registering
     ? "Create an account with the demo access code to save manuscripts across devices."
-    : "Sign in to open your manuscripts from any device.";
+    : recovering ? "Enter one unused recovery code to choose a new password."
+      : "Sign in to open your manuscripts from any device.";
   $("invite-field").hidden = !registering;
   $("auth-invite").required = registering;
-  $("auth-password").minLength = registering ? 12 : 1;
-  $("auth-password").autocomplete = registering ? "new-password" : "current-password";
-  $("auth-submit").textContent = registering ? "Create account" : "Sign in";
+  $("recovery-field").hidden = !recovering;
+  $("auth-recovery-code").required = recovering;
+  $("auth-password-label").textContent = recovering ? "New password" : "Password";
+  $("auth-password").minLength = registering || recovering ? 12 : 1;
+  $("auth-password").autocomplete = registering || recovering ? "new-password" : "current-password";
+  $("auth-submit").textContent = registering ? "Create account" : recovering ? "Reset password" : "Sign in";
   $("auth-error").hidden = true;
   $("auth-error").textContent = "";
+  $("auth-error").classList.remove("auth-success");
 }
+
+let recoveryDone;
+function showRecoveryCodes(codes, onContinue) {
+  recoveryDone = onContinue;
+  $("recovery-code-list").textContent = codes.join("\n");
+  $("recovery-saved").checked = false;
+  $("recovery-continue").disabled = true;
+  $("recovery-error").hidden = true;
+  if (!$("recovery-dialog").open) $("recovery-dialog").showModal();
+}
+
+$("recovery-saved").addEventListener("change", () => {
+  $("recovery-continue").disabled = !$("recovery-saved").checked;
+});
+$("download-recovery-codes").addEventListener("click", () => {
+  const file = new Blob([$("recovery-code-list").textContent + "\n"], { type: "text/plain" });
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "tessera-recovery-codes.txt";
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+$("recovery-continue").addEventListener("click", async () => {
+  if (!$("recovery-saved").checked) return;
+  $("recovery-dialog").close();
+  const action = recoveryDone;
+  recoveryDone = undefined;
+  if (action) {
+    try { await action(); }
+    catch (error) {
+      $("auth-error").textContent = error.message;
+      $("auth-error").hidden = false;
+    }
+  }
+});
+$("recovery-dialog").addEventListener("cancel", event => event.preventDefault());
 
 async function enterWorkspace() {
   const user = accountState.current();
@@ -736,6 +857,8 @@ async function enterWorkspace() {
 
 $("auth-login-tab").addEventListener("click", () => setAuthMode("login"));
 $("auth-register-tab").addEventListener("click", () => setAuthMode("register"));
+$("auth-recover").addEventListener("click", () => setAuthMode("recover"));
+$("auth-back").addEventListener("click", () => setAuthMode("login"));
 $("auth-local").addEventListener("click", async () => {
   const button = $("auth-local");
   button.disabled = true;
@@ -756,13 +879,30 @@ $("auth-form").addEventListener("submit", async event => {
   const submit = $("auth-submit");
   const errorBox = $("auth-error");
   submit.disabled = true;
-  submit.textContent = authMode === "register" ? "Creating account…" : "Signing in…";
+  submit.textContent = authMode === "register" ? "Creating account…" : authMode === "recover" ? "Resetting password…" : "Signing in…";
   errorBox.hidden = true;
   try {
     const email = $("auth-email").value;
     const password = $("auth-password").value;
-    if (authMode === "register") await accountState.register(email, password, $("auth-invite").value);
-    else await accountState.login(email, password);
+    if (authMode === "recover") {
+      const result = await accountState.recover(email, $("auth-recovery-code").value, password);
+      setAuthMode("login");
+      errorBox.textContent = result.message;
+      errorBox.classList.add("auth-success");
+      errorBox.hidden = false;
+      return;
+    }
+    if (authMode === "register") {
+      const registration = await accountState.register(email, password, $("auth-invite").value);
+      if (registration.recoveryCodes) {
+        showRecoveryCodes(registration.recoveryCodes, async () => {
+          const manuscripts = await accountState.initialize();
+          if (!manuscripts) throw new Error("Your sign-in did not start a session. Please try again.");
+          await enterWorkspace();
+        });
+        return;
+      }
+    } else await accountState.login(email, password);
     const manuscripts = await accountState.initialize();
     if (!manuscripts) throw new Error("Your sign-in did not start a session. Please try again.");
     await enterWorkspace();
@@ -771,7 +911,7 @@ $("auth-form").addEventListener("submit", async event => {
     errorBox.hidden = false;
   } finally {
     submit.disabled = false;
-    submit.textContent = authMode === "register" ? "Create account" : "Sign in";
+    submit.textContent = authMode === "register" ? "Create account" : authMode === "recover" ? "Reset password" : "Sign in";
   }
 });
 

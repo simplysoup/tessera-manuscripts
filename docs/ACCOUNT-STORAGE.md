@@ -15,13 +15,17 @@ environment before deployment and share it only with demo participants.
 Passwords are stored as PBKDF2-SHA-256 hashes with per-account random salts
 using the Workers runtime's 100,000-iteration limit. For this small demo,
 registration also requires a 12-character password and login attempts are
-rate-limited; this setup is not a substitute for a production identity service.
+rate-limited per source IP and per account name; password recovery attempts use
+the same limits. This setup is not a substitute for a production identity service.
 Successful sign-in creates a random, HttpOnly session cookie; on HTTPS it uses
 Secure and SameSite=None so sign-in also works when the Site is embedded. Only
 its SHA-256 hash is stored. Authentication attempts are
-limited by source IP. Email is used as the account name but is not verified, and
-the demo does not include password recovery or account administration. Remove
-the invite secret or replace it after the demo to stop new registrations.
+limited by source IP and account name. Registration issues ten one-time recovery
+codes. Only their hashes are stored. A code can reset the password and revoke
+all sessions; signed-in users can rotate the set after confirming their current
+password. Email is used as the account name but is not verified, and recovery
+does not send email. Remove the invite secret or replace it after the demo to
+stop new registrations.
 
 Local `npm start` uses a fixed local-only identity so the account library can be
 used without creating a demo account.
@@ -39,10 +43,12 @@ when they choose local mode in that browser.
   Every list, read, update, and delete query includes that owner ID.
 - `user_room_access` records shared rooms the signed-in user has opened, so
   those rooms appear in that user's library on their other devices.
-- `manuscript_links` stores room or copy snapshots. The invitation UUID is a
-  bearer link: a person who has it can read and edit that room. Links do not
-  expire; users can remove a room from their own library without affecting
-  other users.
+- `manuscript_links` stores room or copy snapshots. A link UUID is a bearer
+  secret: anyone who has it can read the snapshot or edit the room. Account
+  owners can list and revoke their links. Revoking a room deletes its patch
+  history and access records; other users' cached room entries are removed on
+  their next successful library sync. Revocation cannot recall copies already
+  downloaded or imported. Links do not expire automatically.
 - Browser IndexedDB holds a local working cache. Existing unowned local drafts
   are claimed by the first account that signs in on that browser and copied to
   its cloud library. Local documents tagged to a different account stay hidden.
@@ -52,6 +58,7 @@ Database changes are in `drizzle/0001_account_manuscripts.sql` and
 before uploading the Worker.
 
 The initial abuse bounds are 100 private manuscripts and 20 new share links per
-account per day, a 512 KiB manuscript/patch size, and 20 MiB of accepted patch
-history per room. These are guardrails for a small demo, not production-scale
-identity or abuse controls.
+account per day, 12 authentication or recovery attempts per IP/account in 15
+minutes, 60 accepted room edits per room per minute, a 512 KiB manuscript/patch
+size, and 20 MiB of accepted patch history per room. These are guardrails for a
+small demo, not production-scale identity or abuse controls.

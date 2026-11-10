@@ -8,7 +8,7 @@ class RequestError extends Error {
 }
 
 async function request(path, data, signal) {
-  const options = { signal, cache: "no-store" };
+  const options = { signal, cache: "no-store", credentials: "include" };
   if (data !== undefined) Object.assign(options, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
   });

@@ -33,18 +33,21 @@
       <div class="eyebrow">A SMALL, PRIVATE DEMO</div>
       <h1 id="auth-title">Welcome back<span>.</span></h1>
       <p id="auth-copy">Sign in to open your manuscripts from any device.</p>
-      <div class="auth-tabs" role="group" aria-label="Account action">
+      <div class="auth-tabs" id="auth-tabs" role="group" aria-label="Account action">
         <button id="auth-login-tab" class="selected" type="button">Sign in</button>
         <button id="auth-register-tab" type="button">Create account</button>
       </div>
       <form id="auth-form">
         <label>Email<input id="auth-email" name="email" type="email" autocomplete="email" maxlength="254" required></label>
-        <label>Password<input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required></label>
+        <label><span id="auth-password-label">Password</span><input id="auth-password" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required></label>
+        <label id="recovery-field" hidden>One-time recovery code<input id="auth-recovery-code" name="recovery-code" type="text" autocomplete="off" maxlength="40"></label>
         <label id="invite-field" hidden>Demo access code<input id="auth-invite" name="invite" type="password" autocomplete="off" maxlength="128"></label>
         <p id="auth-error" class="auth-error" role="alert" hidden></p>
         <button id="auth-submit" class="button dark" type="submit">Sign in</button>
       </form>
-      <p class="auth-footnote">Demo accounts are limited to invited participants. Email is used as your account name and is not verified.</p>
+      <button id="auth-recover" class="text-button" type="button">Forgot your password? Use a recovery code</button>
+      <button id="auth-back" class="text-button" type="button" hidden>Back to sign in</button>
+      <p class="auth-footnote">Demo accounts are invitation-only. Email is not verified; save your one-time recovery codes somewhere safe.</p>
       <div class="auth-local">
         <button id="auth-local" class="button outline" type="button">Continue locally</button>
         <p>No account needed. Drafts stay in this browser only; there is no cloud saving or link sharing. Export a file to move or share your work.</p>
@@ -146,10 +149,39 @@
   </section>
   <input type="file" id="file" accept=".tex,.tm" hidden>
   <dialog id="dialog"><form method="dialog" id="dialog-form"><div class="eyebrow" id="dialog-label"></div><h2 id="dialog-title"></h2><p id="dialog-copy"></p><label id="name-field" hidden><span id="name-label">Manuscript name</span><input id="name" maxlength="90" autocomplete="off"></label><div class="dialog-actions"><button class="button outline" value="cancel" type="submit" formnovalidate>Cancel</button><button class="button dark" id="dialog-confirm" value="confirm" type="submit">Done</button></div></form></dialog>
+  <dialog id="account-dialog" aria-labelledby="account-title">
+    <form method="dialog">
+      <div class="eyebrow">ACCOUNT</div><h2 id="account-title">Your account</h2>
+      <p id="account-email"></p>
+      <section class="account-section">
+        <h3>Account recovery</h3>
+        <p>Recovery codes can reset your password and sign out other devices. Generating a new set invalidates the previous set.</p>
+        <label>Current password<input id="recovery-current-password" type="password" autocomplete="current-password" maxlength="128"></label>
+        <button id="generate-recovery-codes" type="button" class="button outline">Generate new recovery codes</button>
+      </section>
+      <section class="account-section">
+        <h3>Shared links</h3>
+        <p>Anyone with an active link can access its manuscript. Revoking a link prevents new access; downloaded copies cannot be recalled.</p>
+        <div id="account-links" class="account-links"></div>
+      </section>
+      <div class="dialog-actions"><button id="account-sign-out" type="button" class="button outline">Sign out</button><button class="button dark" value="close">Done</button></div>
+    </form>
+  </dialog>
+  <dialog id="recovery-dialog" aria-labelledby="recovery-title">
+    <form method="dialog" id="recovery-form">
+      <div class="eyebrow">SAVE THESE NOW</div><h2 id="recovery-title">Your recovery codes</h2>
+      <p>Each code works once. Tessera stores only their hashes, so these codes cannot be shown again. Save the file somewhere private.</p>
+      <pre id="recovery-code-list" class="recovery-code-list"></pre>
+      <button id="download-recovery-codes" type="button" class="button outline">Download codes</button>
+      <label class="recovery-ack"><input id="recovery-saved" type="checkbox"> I have saved these codes somewhere safe</label>
+      <p id="recovery-error" class="auth-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button id="recovery-continue" type="button" class="button dark" disabled>Continue</button></div>
+    </form>
+  </dialog>
   <dialog id="share-dialog" aria-labelledby="share-title">
     <form method="dialog">
       <div class="eyebrow">MANUSCRIPT SHARING</div><h2 id="share-title">Share manuscript</h2>
-      <p>People can join a shared manuscript with its invitation link. Your private manuscripts stay in your account.</p>
+      <p>Share links are bearer access: anyone with a link can open that manuscript. You can revoke links from Account; downloaded copies cannot be recalled.</p>
       <div class="share-panel">
         <label for="room-link">Edit together</label>
         <p id="room-help">Share this manuscript to let another person edit it with you.</p>

@@ -78,25 +78,77 @@ async function passwordDigest(password, salt, iterations = passwordIterations) {
   return new Uint8Array(bits);
 }
 
-async function createSession(user, request, db) {
+async function createSession(user, request, db, extra = {}) {
   const token = encodeBase64Url(crypto.getRandomValues(new Uint8Array(32)));
   const tokenHash = bytesToHex(await digest(new TextEncoder().encode(token)));
   const expires = Date.now() + sessionLifetime;
+  await db.prepare("DELETE FROM demo_sessions WHERE expires_at <= ?").bind(Date.now()).run();
   await db.prepare("INSERT INTO demo_sessions (token_hash, owner_id, expires_at, created) VALUES (?, ?, ?, ?)")
     .bind(tokenHash, user.id, expires, Date.now()).run();
-  return json({ user: { sub: user.id, email: user.email } }, 200, { "Set-Cookie": sessionCookie(token, request) });
+  return json({ user: { sub: user.id, email: user.email }, ...extra }, 200, { "Set-Cookie": sessionCookie(token, request) });
 }
 
-async function consumeAuthAttempt(request, db) {
+async function accountRateKey(email) {
+  return bytesToHex(await digest(new TextEncoder().encode("tessera-auth:" + email.trim().toLowerCase())));
+}
+
+async function consumeAuthAttempt(request, db, accountHash = null) {
   const address = request.headers.get("cf-connecting-ip") ?? "local-development";
   const ipHash = bytesToHex(await digest(new TextEncoder().encode(address)));
   const now = Date.now();
   await db.prepare("DELETE FROM demo_auth_attempts WHERE attempted < ?").bind(now - 24 * 60 * 60 * 1000).run();
-  const recent = await db.prepare("SELECT COUNT(*) AS count FROM demo_auth_attempts WHERE ip_hash = ? AND attempted > ?")
-    .bind(ipHash, now - 15 * 60 * 1000).first();
+  const recent = await db.prepare(`SELECT COUNT(*) AS count FROM demo_auth_attempts
+    WHERE attempted > ? AND (ip_hash = ? OR (? IS NOT NULL AND account_hash = ?))`)
+    .bind(now - 15 * 60 * 1000, ipHash, accountHash, accountHash).first();
   if (recent.count >= 12) return false;
-  await db.prepare("INSERT INTO demo_auth_attempts (ip_hash, attempted) VALUES (?, ?)").bind(ipHash, now).run();
+  await db.prepare("INSERT INTO demo_auth_attempts (ip_hash, account_hash, attempted) VALUES (?, ?, ?)")
+    .bind(ipHash, accountHash, now).run();
   return true;
+}
+
+function normalizeRecoveryCode(value) {
+  return typeof value === "string" ? value.toUpperCase().replace(/[^A-F0-9]/gu, "") : "";
+}
+
+async function recoveryCodeHash(value) {
+  return bytesToHex(await digest(new TextEncoder().encode("tessera-recovery:" + value)));
+}
+
+async function replaceRecoveryCodes(db, userId) {
+  const codes = Array.from({ length: 10 }, () => {
+    const hex = bytesToHex(crypto.getRandomValues(new Uint8Array(16))).toUpperCase();
+    return hex.match(/.{1,4}/gu).join("-");
+  });
+  const statements = [db.prepare("DELETE FROM demo_recovery_codes WHERE user_id = ?").bind(userId)];
+  for (const code of codes) {
+    statements.push(db.prepare("INSERT INTO demo_recovery_codes (user_id, code_hash, created, used_at) VALUES (?, ?, ?, NULL)")
+      .bind(userId, await recoveryCodeHash(normalizeRecoveryCode(code)), Date.now()));
+  }
+  await db.batch(statements);
+  return codes;
+}
+
+function validPassword(password) {
+  return typeof password === "string" && password.length >= 12 && password.length <= 128 &&
+    new TextEncoder().encode(password).length <= 512;
+}
+
+function validEmail(email) {
+  if (typeof email !== "string" || email.length > 254 || /\s/u.test(email)) return false;
+  const at = email.indexOf("@");
+  const domain = email.slice(at + 1);
+  return at > 0 && at <= 64 && email.lastIndexOf("@") === at && domain.includes(".") &&
+    domain.split(".").every(part => part.length > 0);
+}
+
+async function validRecoveryCode(db, email, code) {
+  const normalized = normalizeRecoveryCode(code);
+  if (normalized.length !== 32) return null;
+  const hash = await recoveryCodeHash(normalized);
+  return db.prepare(`SELECT c.user_id, u.email FROM demo_recovery_codes c
+    JOIN demo_users u ON u.id = c.user_id
+    WHERE u.email = ? AND c.code_hash = ? AND c.used_at IS NULL`)
+    .bind(email, hash).first();
 }
 
 async function identity(request, env) {
@@ -136,7 +188,7 @@ async function authenticate(request, env, url) {
     const email = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
     const password = typeof value.password === "string" ? value.password : "";
     if (!/^[^\s@]{1,64}@[^\s@.]+(?:\.[^\s@.]+)+$/u.test(email) || email.length > 254 ||
-        password.length < 12 || password.length > 128 || new TextEncoder().encode(password).length > 512) {
+        !validPassword(password)) {
       return json({ error: "Use a valid email and a password between 12 and 128 characters." }, 400);
     }
     const total = await env.DB.prepare("SELECT COUNT(*) AS count FROM demo_users").first();
@@ -148,14 +200,17 @@ async function authenticate(request, env, url) {
       await env.DB.prepare("INSERT INTO demo_users (id, email, salt, password_hash, created) VALUES (?, ?, ?, ?, ?)")
         .bind(id, email, encodeBase64Url(salt), encodeBase64Url(hash), Date.now()).run();
     } catch {
-      return json({ error: "An account with that email already exists." }, 409);
+      return json({ error: "Unable to create an account with those details. Try signing in if you already registered." }, 400);
     }
-    await env.DB.prepare("DELETE FROM demo_auth_attempts WHERE attempted < ?").bind(Date.now() - 24 * 60 * 60 * 1000).run();
-    return createSession({ id, email }, request, env.DB);
+    const recoveryCodes = await replaceRecoveryCodes(env.DB, id);
+    const accountHash = await accountRateKey(email);
+    await env.DB.prepare("DELETE FROM demo_auth_attempts WHERE account_hash = ?").bind(accountHash).run();
+    return createSession({ id, email }, request, env.DB, { recoveryCodes });
   }
   if (url.pathname === "/api/auth/login") {
-    if (!await consumeAuthAttempt(request, env.DB)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
     const email = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
+    const accountHash = await accountRateKey(email);
+    if (!await consumeAuthAttempt(request, env.DB, accountHash)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
     const password = typeof value.password === "string" ? value.password : "";
     const user = await env.DB.prepare("SELECT id, email, salt, password_hash FROM demo_users WHERE email = ?").bind(email).first();
     let valid = false;
@@ -164,7 +219,55 @@ async function authenticate(request, env, url) {
       valid = equalBytes(actual, decodeBase64Url(user.password_hash));
     }
     if (!valid) return json({ error: "Email or password is incorrect." }, 401);
+    await env.DB.prepare("DELETE FROM demo_auth_attempts WHERE account_hash = ?").bind(accountHash).run();
     return createSession(user, request, env.DB);
+  }
+  if (url.pathname === "/api/auth/recover") {
+    const email = typeof value.email === "string" ? value.email.trim().toLowerCase() : "";
+    const accountHash = await accountRateKey(email);
+    if (!await consumeAuthAttempt(request, env.DB, accountHash)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
+    const code = normalizeRecoveryCode(value.recoveryCode);
+    const password = value.password;
+    if (!validEmail(email) || code.length !== 32 || !validPassword(password)) {
+      return json({ error: "The recovery details could not be verified." }, 400);
+    }
+    const user = await env.DB.prepare("SELECT id FROM demo_users WHERE email = ?").bind(email).first();
+    const codeHash = await recoveryCodeHash(code);
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const passwordHash = await passwordDigest(password, salt);
+    const marker = -(Date.now() + crypto.getRandomValues(new Uint32Array(1))[0]);
+    const results = await env.DB.batch([
+      env.DB.prepare(`UPDATE demo_recovery_codes SET used_at = ?
+        WHERE user_id = ? AND code_hash = ? AND used_at IS NULL RETURNING user_id`)
+        .bind(marker, user?.id ?? "", codeHash),
+      env.DB.prepare(`UPDATE demo_users SET salt = ?, password_hash = ?
+        WHERE id = ? AND EXISTS (SELECT 1 FROM demo_recovery_codes WHERE user_id = ? AND code_hash = ? AND used_at = ?)`)
+        .bind(encodeBase64Url(salt), encodeBase64Url(passwordHash), user?.id ?? "", user?.id ?? "", codeHash, marker),
+      env.DB.prepare(`DELETE FROM demo_sessions WHERE owner_id = ? AND EXISTS
+        (SELECT 1 FROM demo_recovery_codes WHERE user_id = ? AND code_hash = ? AND used_at = ?)`)
+        .bind(user?.id ?? "", user?.id ?? "", codeHash, marker),
+      env.DB.prepare("DELETE FROM demo_auth_attempts WHERE account_hash = ?").bind(accountHash),
+    ]);
+    const consumed = (results[0]?.results?.length ?? results[0]?.meta?.changes ?? 0) > 0;
+    if (!consumed) return json({ error: "The recovery details could not be verified." }, 400);
+    return json({ ok: true, message: "Password updated. Sign in with your new password." }, 200,
+      { "Set-Cookie": sessionCookie("", request, true) });
+  }
+  if (url.pathname === "/api/auth/recovery-codes") {
+    const user = await identity(request, env);
+    if (!user) return json({ error: "Sign in to update recovery codes." }, 401);
+    const accountHash = await accountRateKey(user.email);
+    if (!await consumeAuthAttempt(request, env.DB, accountHash)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
+    const record = await env.DB.prepare("SELECT salt, password_hash FROM demo_users WHERE id = ?").bind(user.sub).first();
+    const password = typeof value.password === "string" ? value.password : "";
+    let valid = false;
+    if (record && password.length <= 128) {
+      valid = equalBytes(await passwordDigest(password, decodeBase64Url(record.salt)), decodeBase64Url(record.password_hash));
+    }
+    if (!valid) return json({ error: "The current password is incorrect." }, 401);
+    await env.DB.prepare("DELETE FROM demo_auth_attempts WHERE account_hash = ?").bind(accountHash).run();
+    const recoveryCodes = await replaceRecoveryCodes(env.DB, user.sub);
+    return json({ recoveryCodes });
   }
   if (url.pathname === "/api/auth/logout") {
     const user = await identity(request, env);
@@ -246,6 +349,33 @@ async function library(request, url, db, user) {
   return json({ error: "Method not allowed." }, 405);
 }
 
+async function accountLinks(request, url, db, user) {
+  const parts = url.pathname.split("/");
+  if (request.method === "GET" && parts.length === 4) {
+    const { results } = await db.prepare(`SELECT id, kind, title, created FROM manuscript_links
+      WHERE owner_id = ? ORDER BY created DESC`).bind(user.sub).all();
+    return json(results);
+  }
+  const id = parts[4];
+  if (request.method === "DELETE" && parts.length === 5 && uuid.test(id ?? "")) {
+    const results = await db.batch([
+      db.prepare("DELETE FROM room_change_limits WHERE room_id = ? AND EXISTS (SELECT 1 FROM manuscript_links WHERE id = ? AND owner_id = ?)")
+        .bind(id, id, user.sub),
+      db.prepare(`DELETE FROM room_changes WHERE room_id = ? AND EXISTS
+        (SELECT 1 FROM manuscript_links WHERE id = ? AND owner_id = ?)`)
+        .bind(id, id, user.sub),
+      db.prepare(`DELETE FROM user_room_access WHERE room_id = ? AND EXISTS
+        (SELECT 1 FROM manuscript_links WHERE id = ? AND owner_id = ?)`)
+        .bind(id, id, user.sub),
+      db.prepare("DELETE FROM manuscript_links WHERE id = ? AND owner_id = ? RETURNING id")
+        .bind(id, user.sub),
+    ]);
+    const deleted = (results[3]?.results?.length ?? results[3]?.meta?.changes ?? 0) > 0;
+    return deleted ? json({ ok: true }) : json({ error: "Shared link not found." }, 404);
+  }
+  return json({ error: "Shared link not found." }, 404);
+}
+
 async function links(request, url, db) {
   const [, , , kind, id, action, extra] = url.pathname.split("/");
   const method = request.method;
@@ -290,6 +420,14 @@ async function links(request, url, db) {
       const value = await payload(request);
       if (!value || !uuid.test(value.id) || !Number.isSafeInteger(value.revision) || value.revision < 0 ||
           !small(value.patch) || !value.patch.startsWith("(")) return json({ error: "Invalid manuscript change." }, 400);
+      const room = await db.prepare("SELECT id FROM manuscript_links WHERE id = ? AND kind = 'room'").bind(id).first();
+      if (!room) return json({ error: "This shared manuscript is unavailable." }, 404);
+      const minute = Math.floor(Date.now() / 60000);
+      await db.prepare("DELETE FROM room_change_limits WHERE minute < ?").bind(minute - 120).run();
+      const allowance = await db.prepare(`INSERT INTO room_change_limits (room_id, minute, count) VALUES (?, ?, 1)
+        ON CONFLICT (room_id, minute) DO UPDATE SET count = count + 1 WHERE count < 60 RETURNING count`)
+        .bind(id, minute).first();
+      if (!allowance) return json({ error: "This shared manuscript is receiving edits too quickly. Try again shortly." }, 429);
       // Checking the head and inserting the next revision is one SQLite statement.
       const saved = await db.prepare(`
         INSERT INTO room_changes (room_id, revision, operation_id, patch)
@@ -319,6 +457,19 @@ export default {
       catch (error) {
         console.error("Tessera account sign-in failed", error.name);
         return json({ error: "Account sign-in is temporarily unavailable." }, 503);
+      }
+    }
+    if (url.pathname === "/api/account/links" || url.pathname.startsWith("/api/account/links/")) {
+      try {
+        const user = await identity(request, env);
+        if (!user) return json({ error: "Sign in to manage shared links." }, 401);
+        if (request.method !== "GET" && request.headers.get("origin") !== url.origin) {
+          return json({ error: "Open Tessera to manage shared links." }, 403);
+        }
+        return await accountLinks(request, url, env.DB, user);
+      } catch (error) {
+        console.error("Tessera shared-link management failed", error.name);
+        return json({ error: "Shared links are temporarily unavailable." }, 503);
       }
     }
     if (url.pathname === "/api/library" || url.pathname.startsWith("/api/library/")) {

@@ -43,7 +43,7 @@ const types = {
 const downloads = new Map();
 
 const sqlite = new DatabaseSync(":memory:");
-for (const migration of ["0000_manuscript_links.sql", "0001_account_manuscripts.sql", "0002_demo_accounts.sql"]) {
+for (const migration of ["0000_manuscript_links.sql", "0001_account_manuscripts.sql", "0002_demo_accounts.sql", "0003_recovery_privacy_limits.sql"]) {
   sqlite.exec(await readFile(join(root, "drizzle", migration), "utf8"));
 }
 const DB = {

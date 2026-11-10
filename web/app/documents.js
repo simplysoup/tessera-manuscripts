@@ -122,7 +122,9 @@ async function syncLibrary() {
   }
   for (const draft of local) {
     if (draft.localOnly || draft.ownerId === "browser-local") continue;
-    if (draft.room && draft.ownerId === account.sub && !cloudById.has(draft.id)) synced.push(draft);
+    if (draft.room && draft.ownerId === account.sub && !cloudById.has(draft.id)) {
+      await request("readwrite", store => store.delete(draft.id));
+    }
     else if (!cloudById.has(draft.id) && draft.ownerId === account.sub && draft.format !== "tm") synced.push(draft);
   }
   for (const draft of local) if (!draft.ownerId && draft.format !== "tm") synced.push(draft);
@@ -157,6 +159,10 @@ export const accountState = {
   },
   register: (email, password, invite) => cloud("/api/auth/register", { method: "POST", body: { email, password, invite } }),
   login: (email, password) => cloud("/api/auth/login", { method: "POST", body: { email, password } }),
+  recover: (email, recoveryCode, password) => cloud("/api/auth/recover", { method: "POST", body: { email, recoveryCode, password } }),
+  rotateRecoveryCodes: password => cloud("/api/auth/recovery-codes", { method: "POST", body: { password } }),
+  sharedLinks: () => cloud("/api/account/links"),
+  revokeSharedLink: id => cloud("/api/account/links/" + id, { method: "DELETE" }),
   logout: async () => {
     if (account?.localOnly) { account = null; return; }
     if (account?.local) return;
