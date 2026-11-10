@@ -121,7 +121,7 @@ async function load(path) {
 
 function respond(request, response, path, bytes) {
   const headers = {
-    "Content-Type": types[extname(path)] ?? "application/octet-stream",
+    "Content-Type": path.endsWith("/") ? "text/html; charset=utf-8" : (types[extname(path)] ?? "application/octet-stream"),
     "Accept-Ranges": "bytes",
     "X-Content-Type-Options": "nosniff",
   };

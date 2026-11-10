@@ -27,6 +27,8 @@ if (process.env.NODE_TEST_CONTEXT) {
     assert.match(await (await get("/legal/texmacs.html.txt")).text(), /tessera-embedded/u);
     assert.equal((await get("/app/style.css")).headers.get("content-type"), "text/css; charset=utf-8");
     assert.equal((await get("/app/shortcuts.js")).headers.get("content-type"), "text/javascript; charset=utf-8");
+    assert.equal((await get("/")).headers.get("content-type"), "text/html; charset=utf-8");
+    assert.equal((await get("/legal/")).headers.get("content-type"), "text/html; charset=utf-8");
     assert.match(await (await get("/texmacs.html")).text(), /TeXmacs Upsilon/u);
     const wasm = await get("/texmacs.wasm", { headers: { Range: "bytes=0-7" } });
     assert.equal(wasm.status, 206);
