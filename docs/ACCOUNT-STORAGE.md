@@ -53,9 +53,8 @@ when they choose local mode in that browser.
   are claimed by the first account that signs in on that browser and copied to
   its cloud library. Local documents tagged to a different account stay hidden.
 
-Database changes are in `drizzle/0001_account_manuscripts.sql` and
-`drizzle/0002_demo_accounts.sql`; the Site deployment applies the migrations
-before uploading the Worker.
+Database changes are in the ordered `drizzle/` migrations; the Site deployment
+applies them before uploading the Worker.
 
 The initial abuse bounds are 100 private manuscripts and 20 new share links per
 account per day, 12 authentication or recovery attempts per IP/account in 15

@@ -1,62 +1,70 @@
-# Tessera manuscript studio
+# Tessera
 
-Tessera adds a browser library and a focused manuscript workspace around the
-pinned **TeXmacs Upsilon 2.1.5** WebAssembly editor. Upsilon owns text and
-equation editing, the caret, structured markup, rendering and export.
+Tessera is a web-native scientific writing workspace built around the pinned
+TeXmacs Upsilon 2.1.5 WebAssembly editor. The editor and typesetter run in the
+browser. The Worker serves the app and stores account manuscripts; it does not
+run TeXmacs or compile documents on the server.
 
-## Run
+## Start locally
 
-Run `npm start` with Node.js 22 or later, then open
-[the workspace](http://127.0.0.1:4173/). Use **New manuscript**,
-**Math playground**, or import a single `.tm` or `.tex` file.
+Requirements: Node.js 22 or newer and npm.
 
-- Click directly on the page to edit. **Insert** adds a section, theorem, or
-  equation at the native caret. **Tools** reveals the full native icon
-  bars and tabs. **Source** switches the same document into editable markup.
-- Click the title to rename a draft. The studio saves locally after edits,
-  and **Save** commits on demand. The library lists and searches saved drafts.
-  Each draft can be open for editing in one tab on the same browser origin.
-- **Export** downloads a PDF, LaTeX, or native TeXmacs copy. Signed-in private
-  manuscripts sync to your account; IndexedDB keeps a local working copy.
-  Shared rooms appear in your account after you open their invitation link.
-- Append `?gpu=0` to use the upstream MuPDF rendering path. Otherwise the
-  browser build selects its renderer.
+```sh
+npm ci
+npm start
+```
 
-`npm run build` builds the static site in `dist/`. The local server can fetch
-additional manifest-listed fonts on demand. The static build includes the
-fonts bundled in `engine/fonts/`.
+Open <http://127.0.0.1:4173/>. Choose **Continue locally** for browser-only
+drafts, or use **New manuscript** or a sample to explore. The local server uses
+an in-memory database and a development identity; it needs no account or
+secrets. Stop it with `Ctrl+C`.
 
-For a draft created with the first Workbench prototype, export the draft as
-`.tex` from that version, then import the file in this edition. The first
-account sign-in moves existing local TeXmacs drafts into that account.
+## Verify and build
 
-## Scope
+```sh
+npm test
+npm run build
+```
 
-This package focuses on the native scientific editing workflow. Collaboration
-uses account-owned storage plus bearer invitation links and a durable room journal.
-The acceptance suite uses native patches,
-a file-backed journal fixture, and controlled delivery. The old slot model and its
-two-tab CRDT are no longer part of the editor. The port's optional
-computational plug-in bundles and desktop external programs are outside this
-local package. LaTeX compatibility follows the pinned native converter and
-depends on the commands and packages used by a document.
+`npm test` runs the server, editor-contract, sharing, collaboration-journal,
+shortcut, and account-security checks. Browser checks use Playwright and a
+local Chromium installation:
 
-[Port notes](docs/PORT.md) trace input, trees, typesetting, export, and the
-native modification hook for collaboration. They also identify the exact
-upstream sources and build recipe.
+```sh
+npx playwright install chromium
+npm run test:browser
+npm run test:collaboration
+```
 
-The public demo uses Tessera email/password accounts gated by a shared invite
-code. Account storage, demo limits, and setup are described in
-[Account storage](docs/ACCOUNT-STORAGE.md).
-Visitors can instead continue locally without signing in; those manuscripts
-stay in browser storage and can be moved or shared only by exporting a file.
+Set `CHROMIUM_PATH` to use an existing Chromium executable. `CHROMIUM_ARGS` may
+contain a JSON array of extra launch flags. `npm run build` writes the deployable
+Worker and static app to `dist/`.
 
-## Verify
+## Working in the editor
 
-Run `npm ci`, `npx playwright install chromium`, `npm test`, then
-`npm run test:collaboration`. The first suite checks asset serving and
-the journal contract. The collaboration suite runs two independent
-Upsilon WASM browsers through concurrent matrix edits and host handoff.
-See [the collaboration contract and test scope](docs/COLLABORATION.md).
-Set `CHROMIUM_PATH` to an existing Chromium executable and
-`CHROMIUM_ARGS` to a JSON array of launch flags if needed.
+- Click the page to edit at the native caret. **Insert** adds structure, **Tools**
+  opens the native toolbars, and **Source** edits the document markup.
+- Drafts in **Continue locally** remain in that browser's IndexedDB. Export a
+  file to move or share them. Sign in to sync private manuscripts across devices
+  and create share links.
+- Shared links are bearer links: anyone holding one can open it. Owners can
+  revoke links; downloaded copies cannot be recalled.
+- Append `?gpu=0` to use the upstream MuPDF rendering path.
+
+## Project map
+
+| Path | Purpose |
+| --- | --- |
+| `web/app/` | Tessera interface, account flows, local storage, editor integration |
+| `worker/index.js` | API routes, authentication, account storage, share rooms |
+| `drizzle/` | Ordered database migrations |
+| `engine/` | Pinned Upsilon WASM build, fonts, and asset manifest |
+| `web/examples/`, `web/tutorials/` | Editable sample manuscripts and lessons |
+| `test/` | Worker, editor, room, browser, and collaboration checks |
+| `docs/` | Architecture, data handling, and collaboration notes |
+
+See [Account storage](docs/ACCOUNT-STORAGE.md) for demo account setup and data
+behavior, [Port notes](docs/PORT.md) for the native engine integration, and the
+[collaboration contract](docs/COLLABORATION.md) for the room model and its test
+scope. The build uses the included Upsilon engine; compiling the upstream C++
+engine is not part of the local start path.
