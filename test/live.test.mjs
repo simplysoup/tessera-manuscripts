@@ -219,8 +219,10 @@ test("manuscripts larger than the patch limit can be shared and snapshotted, up 
   const tooLarge = "<TeXmacs|2.1.5>\n" + "x".repeat(10 * 1024 * 1024 + 1);
   assert.equal((await send("room", { title: "Too large", manuscript: tooLarge })).status, 400);
   assert.equal((await send("room/" + room + "/snapshot", { revision: 1, manuscript: tooLarge })).status, 400);
-  // A patch over 512 KB is still refused, even though manuscripts are larger.
-  assert.equal((await send("room/" + room + "/changes", { id: crypto.randomUUID(), revision: 1, patch: "(" + "x".repeat(600 * 1024) })).status, 400);
+  // A patch over 10 MB is still refused, but a 600 KB patch (an image-sized
+  // edit) is now accepted, like the manuscript that carries it.
+  assert.equal((await send("room/" + room + "/changes", { id: crypto.randomUUID(), revision: 1, patch: "(" + "x".repeat(600 * 1024) })).status, 201);
+  assert.equal((await send("room/" + room + "/changes", { id: crypto.randomUUID(), revision: 2, patch: "(" + "x".repeat(10 * 1024 * 1024 + 1) })).status, 400);
 });
 
 test("a local patch failure pauses sync instead of reconnecting forever", async t => {

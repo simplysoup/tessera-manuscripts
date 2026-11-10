@@ -1,11 +1,19 @@
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
-const sizeLimit = 512 * 1024;
+// A patch is one edit, and it can carry an embedded image too: inserting
+// a figure produces a patch holding the image bytes, so patches get the
+// same 10 MB limit as manuscripts. The room log cap below is raised to
+// match, so a couple of image patches cannot fill the log.
 // A manuscript is a whole document, and a single embedded image already
-// exceeds the patch limit (a 400 KB JPEG is ~530 KB once base64-encoded in
-// the .tm file), so manuscripts get their own, larger limit. Patches stay
-// at 512 KB. The JSON body cap leaves room for a manuscript plus its wrapper.
+// exceeds the old 512 KB limit (a 400 KB JPEG is ~530 KB once base64-encoded
+// in the .tm file). The JSON body cap leaves room for a manuscript or a
+// patch plus its wrapper.
+const patchLimit = 10 * 1024 * 1024;
 const manuscriptLimit = 10 * 1024 * 1024;
 const bodyLimit = manuscriptLimit + 1024 * 1024;
+// The change log for one room is bounded so a runaway client cannot grow
+// the database without limit. Snapshots do not prune it yet, so the cap is
+// generous enough for several image-sized patches between checkpoints.
+const roomLogLimit = 200 * 1024 * 1024;
 const sessionLifetime = 30 * 24 * 60 * 60 * 1000;
 // Cloudflare Workers caps Web Crypto PBKDF2 at 100,000 iterations.
 const passwordIterations = 100000;
@@ -37,7 +45,7 @@ async function payload(request) {
   }
 }
 
-const small = text => typeof text === "string" && new TextEncoder().encode(text).length <= sizeLimit;
+const small = text => typeof text === "string" && new TextEncoder().encode(text).length <= patchLimit;
 const manuscriptOk = text => typeof text === "string" && new TextEncoder().encode(text).length <= manuscriptLimit;
 
 function decodeBase64Url(value) {
@@ -477,7 +485,7 @@ async function links(request, url, db) {
         SELECT ?, ?, ?, ?
         WHERE EXISTS (SELECT 1 FROM manuscript_links WHERE id = ? AND kind = 'room')
           AND COALESCE((SELECT MAX(revision) FROM room_changes WHERE room_id = ?), 0) = ?
-          AND (SELECT COALESCE(SUM(length(CAST(patch AS BLOB))), 0) FROM room_changes WHERE room_id = ?) + length(CAST(? AS BLOB)) <= 20971520
+          AND (SELECT COALESCE(SUM(length(CAST(patch AS BLOB))), 0) FROM room_changes WHERE room_id = ?) + length(CAST(? AS BLOB)) <= ${roomLogLimit}
         ON CONFLICT DO NOTHING RETURNING revision
       `).bind(id, value.revision + 1, value.id, value.patch, id, id, value.revision, id, value.patch).first();
       if (saved) return json(saved, 201);
