@@ -16,8 +16,9 @@ Passwords are stored as PBKDF2-SHA-256 hashes with per-account random salts
 using the Workers runtime's 100,000-iteration limit. For this small demo,
 registration also requires a 12-character password and login attempts are
 rate-limited; this setup is not a substitute for a production identity service.
-Successful sign-in creates a random, HttpOnly, Secure (on HTTPS), SameSite=Lax
-session cookie; only its SHA-256 hash is stored. Authentication attempts are
+Successful sign-in creates a random, HttpOnly session cookie; on HTTPS it uses
+Secure and SameSite=None so sign-in also works when the Site is embedded. Only
+its SHA-256 hash is stored. Authentication attempts are
 limited by source IP. Email is used as the account name but is not verified, and
 the demo does not include password recovery or account administration. Remove
 the invite secret or replace it after the demo to stop new registrations.

@@ -36,6 +36,7 @@ let cloudIds = new Set();
 async function cloud(path, { method = "GET", body } = {}) {
   const response = await fetch(path, {
     method,
+    credentials: "include",
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
     cache: "no-store",

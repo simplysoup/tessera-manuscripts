@@ -65,8 +65,10 @@ function cookieValue(request, name) {
 }
 
 function sessionCookie(token, request, clear = false) {
-  const parts = ["tessera_session=" + (clear ? "" : token), "Path=/", "HttpOnly", "SameSite=Lax", "Max-Age=" + (clear ? "0" : Math.floor(sessionLifetime / 1000))];
-  if (new URL(request.url).protocol === "https:") parts.push("Secure");
+  const secure = new URL(request.url).protocol === "https:";
+  const parts = ["tessera_session=" + (clear ? "" : token), "Path=/", "HttpOnly",
+    "SameSite=" + (secure ? "None" : "Lax"), "Max-Age=" + (clear ? "0" : Math.floor(sessionLifetime / 1000))];
+  if (secure) parts.push("Secure");
   return parts.join("; ");
 }
 
